@@ -1,4 +1,4 @@
--- 📜 Локальный скрипт: Меню + Скорость + Ноуклип + Прыжок + Монеты
+-- 📜 Локальный скрипт: Расширяемое dev-меню
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -8,24 +8,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
 -- ⚙ Настройки
-local boostedSpeed = 50
-local normalSpeed = 16
-local jumpPower = 150
-local normalJump = 50
-
-local speedOn = false
-local noclipOn = false
-local jumpOn = false
-local menuOpen = false
-local minimized = false
+local settings = {
+	Speed = {On = false, Boost = 50, Normal = 16},
+	Jump = {On = false, Boost = 150, Normal = 50},
+	Noclip = {On = false},
+	Menu = {Open = false, Minimized = false},
+}
 
 -- 🧱 GUI
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CustomMenuGui"
+screenGui.Name = "DevMenuGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- 📦 Frame
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 260, 0, 340)
 frame.Position = UDim2.new(0.5, -130, 0.5, -170)
@@ -36,7 +31,7 @@ frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
--- 🔹 Верхняя панель
+-- Верхняя панель
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 30)
 titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
@@ -47,14 +42,14 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -90, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "⚙️ Меню"
+titleLabel.Text = "⚙️ Dev Menu"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 20
 titleLabel.TextColor3 = Color3.new(1, 1, 1)
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = titleBar
 
--- 🔸 Кнопки управления окном
+-- Верхние кнопки управления
 local function createTopButton(text, xOffset)
 	local btn = Instance.new("TextButton")
 	btn.Size = UDim2.new(0, 25, 1, 0)
@@ -72,84 +67,100 @@ local minimizeBtn = createTopButton("–", -75)
 local maximizeBtn = createTopButton("□", -50)
 local closeBtn = createTopButton("X", -25)
 
--- 🟡 Кнопка скорости
-local speedButton = Instance.new("TextButton")
-speedButton.Size = UDim2.new(1, -20, 0, 50)
-speedButton.Position = UDim2.new(0, 10, 0, 50)
-speedButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-speedButton.TextColor3 = Color3.new(1, 1, 1)
-speedButton.Font = Enum.Font.SourceSansBold
-speedButton.TextSize = 20
-speedButton.Text = "Включить скорость"
-speedButton.Parent = frame
+-- 📌 Таблица функций меню
+local menuFunctions = {
+	{
+		Name = "Скорость",
+		Desc = "Включить/Выключить скорость",
+		Callback = function()
+			settings.Speed.On = not settings.Speed.On
+			local char = player.Character
+			if char and char:FindFirstChild("Humanoid") then
+				char.Humanoid.WalkSpeed = settings.Speed.On and settings.Speed.Boost or settings.Speed.Normal
+			end
+		end,
+		ButtonText = function() return settings.Speed.On and "Выключить скорость" or "Включить скорость" end
+	},
+	{
+		Name = "Высокий прыжок",
+		Desc = "Вкл/Выкл высокий прыжок",
+		Callback = function()
+			settings.Jump.On = not settings.Jump.On
+			local char = player.Character
+			if char and char:FindFirstChild("Humanoid") then
+				char.Humanoid.UseJumpPower = true
+				char.Humanoid.JumpPower = settings.Jump.On and settings.Jump.Boost or settings.Jump.Normal
+			end
+		end,
+		ButtonText = function() return settings.Jump.On and "Выключить прыжок" or "Включить прыжок" end
+	},
+	{
+		Name = "Ноуклип",
+		Desc = "Вкл/Выкл ноуклип",
+		Callback = function()
+			settings.Noclip.On = not settings.Noclip.On
+		end,
+		ButtonText = function() return settings.Noclip.On and "Выключить ноуклип" or "Включить ноуклип" end
+	},
+	{
+		Name = "Выдать монеты",
+		Desc = "Вводи число и выдай",
+		Callback = function()
+			local amount = tonumber(moneyBox.Text)
+			if amount and amount > 0 then
+				local event = ReplicatedStorage:FindFirstChild("ClaimReward")
+				if event then
+					event:FireServer("Money", amount)
+				end
+			end
+		end,
+		IsTextBox = true,
+		TextBoxPlaceholder = "Введите кол-во монет",
+		ButtonText = function() return "Выдать монеты" end
+	},
+}
 
--- 🧱 Кнопка ноуклипа
-local noclipButton = Instance.new("TextButton")
-noclipButton.Size = UDim2.new(1, -20, 0, 50)
-noclipButton.Position = UDim2.new(0, 10, 0, 110)
-noclipButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-noclipButton.TextColor3 = Color3.new(1, 1, 1)
-noclipButton.Font = Enum.Font.SourceSansBold
-noclipButton.TextSize = 20
-noclipButton.Text = "Включить ноуклип"
-noclipButton.Parent = frame
+-- 🧱 Создаём кнопки из таблицы
+local startY = 50
+local buttonHeight = 50
+local moneyBox
 
--- 🦘 Кнопка высокого прыжка
-local jumpButton = Instance.new("TextButton")
-jumpButton.Size = UDim2.new(1, -20, 0, 50)
-jumpButton.Position = UDim2.new(0, 10, 0, 170)
-jumpButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-jumpButton.TextColor3 = Color3.new(1, 1, 1)
-jumpButton.Font = Enum.Font.SourceSansBold
-jumpButton.TextSize = 20
-jumpButton.Text = "Включить высокий прыжок"
-jumpButton.Parent = frame
-
--- 💰 Поле ввода для монет
-local moneyBox = Instance.new("TextBox")
-moneyBox.Size = UDim2.new(1, -20, 0, 40)
-moneyBox.Position = UDim2.new(0, 10, 0, 230)
-moneyBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-moneyBox.TextColor3 = Color3.new(1, 1, 1)
-moneyBox.Font = Enum.Font.SourceSansBold
-moneyBox.TextSize = 20
-moneyBox.PlaceholderText = "Введите кол-во монет"
-moneyBox.Text = ""
-moneyBox.Parent = frame
-
-local giveMoneyButton = Instance.new("TextButton")
-giveMoneyButton.Size = UDim2.new(1, -20, 0, 50)
-giveMoneyButton.Position = UDim2.new(0, 10, 0, 280)
-giveMoneyButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-giveMoneyButton.TextColor3 = Color3.new(1, 1, 1)
-giveMoneyButton.Font = Enum.Font.SourceSansBold
-giveMoneyButton.TextSize = 20
-giveMoneyButton.Text = "Выдать монеты"
-giveMoneyButton.Parent = frame
-
--- 🌀 Функции
-local function setSpeed(isBoosted)
-	local character = player.Character
-	if character and character:FindFirstChild("Humanoid") then
-		character.Humanoid.WalkSpeed = isBoosted and boostedSpeed or normalSpeed
+for i, func in ipairs(menuFunctions) do
+	if func.IsTextBox then
+		moneyBox = Instance.new("TextBox")
+		moneyBox.Size = UDim2.new(1, -20, 0, 40)
+		moneyBox.Position = UDim2.new(0, 10, 0, startY)
+		moneyBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		moneyBox.TextColor3 = Color3.new(1, 1, 1)
+		moneyBox.Font = Enum.Font.SourceSansBold
+		moneyBox.TextSize = 20
+		moneyBox.PlaceholderText = func.TextBoxPlaceholder or ""
+		moneyBox.Text = ""
+		moneyBox.Parent = frame
+		startY = startY + 45
 	end
+
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -20, 0, buttonHeight)
+	btn.Position = UDim2.new(0, 10, 0, startY)
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Font = Enum.Font.SourceSansBold
+	btn.TextSize = 20
+	btn.Text = func.ButtonText()
+	btn.Parent = frame
+
+	btn.MouseButton1Click:Connect(function()
+		func.Callback()
+		btn.Text = func.ButtonText()
+	end)
+
+	startY = startY + buttonHeight + 10
 end
 
-local function setJump(isBoosted)
-	local character = player.Character
-	if character and character:FindFirstChild("Humanoid") then
-		character.Humanoid.UseJumpPower = true
-		character.Humanoid.JumpPower = isBoosted and jumpPower or normalJump
-	end
-end
-
-local function toggleNoclip(state)
-	noclipOn = state
-	noclipButton.Text = noclipOn and "Выключить ноуклип" or "Включить ноуклип"
-end
-
+-- Ноуклип цикл
 RunService.Stepped:Connect(function()
-	if noclipOn then
+	if settings.Noclip.On then
 		local char = player.Character
 		if char then
 			for _, part in pairs(char:GetDescendants()) do
@@ -161,71 +172,41 @@ RunService.Stepped:Connect(function()
 	end
 end)
 
--- 🎛 Управление
+-- G — открыть/закрыть меню
 UserInputService.InputBegan:Connect(function(input, isTyping)
 	if isTyping then return end
 	if input.KeyCode == Enum.KeyCode.G then
-		menuOpen = not menuOpen
-		frame.Visible = menuOpen
+		settings.Menu.Open = not settings.Menu.Open
+		frame.Visible = settings.Menu.Open
 	end
 end)
 
-speedButton.MouseButton1Click:Connect(function()
-	speedOn = not speedOn
-	setSpeed(speedOn)
-	speedButton.Text = speedOn and "Выключить скорость" or "Включить скорость"
-end)
-
-noclipButton.MouseButton1Click:Connect(function()
-	toggleNoclip(not noclipOn)
-end)
-
-jumpButton.MouseButton1Click:Connect(function()
-	jumpOn = not jumpOn
-	setJump(jumpOn)
-	jumpButton.Text = jumpOn and "Выключить высокий прыжок" or "Включить высокий прыжок"
-end)
-
-giveMoneyButton.MouseButton1Click:Connect(function()
-	local amount = tonumber(moneyBox.Text)
-	if amount and amount > 0 then
-		local args = {"Money", amount}
-		local event = ReplicatedStorage:FindFirstChild("ClaimReward")
-		if event then
-			event:FireServer(unpack(args))
-		end
-	end
-end)
-
--- 🧭 Кнопки окна
+-- Верхние кнопки
 minimizeBtn.MouseButton1Click:Connect(function()
-	if not minimized then
+	if not settings.Menu.Minimized then
 		frame.Size = UDim2.new(0, 260, 0, 30)
-		minimized = true
+		settings.Menu.Minimized = true
 	end
 end)
 
 maximizeBtn.MouseButton1Click:Connect(function()
-	if minimized then
+	if settings.Menu.Minimized then
 		frame.Size = UDim2.new(0, 260, 0, 340)
-		minimized = false
+		settings.Menu.Minimized = false
 	end
 end)
 
 closeBtn.MouseButton1Click:Connect(function()
 	frame.Visible = false
-	menuOpen = false
+	settings.Menu.Open = false
 end)
 
--- ♻ Сброс
+-- Сброс при спавне
 player.CharacterAdded:Connect(function(character)
 	local humanoid = character:WaitForChild("Humanoid")
-	humanoid.WalkSpeed = normalSpeed
-	humanoid.JumpPower = normalJump
-	speedOn = false
-	noclipOn = false
-	jumpOn = false
-	speedButton.Text = "Включить скорость"
-	noclipButton.Text = "Включить ноуклип"
-	jumpButton.Text = "Включить высокий прыжок"
+	humanoid.WalkSpeed = settings.Speed.Normal
+	humanoid.JumpPower = settings.Jump.Normal
+	settings.Speed.On = false
+	settings.Jump.On = false
+	settings.Noclip.On = false
 end)
