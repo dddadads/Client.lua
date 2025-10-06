@@ -1,4 +1,4 @@
--- 🌌 Хакерская панель Roblox
+-- 🌌 Хакерская панель Roblox (локальный скрипт)
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -12,8 +12,8 @@ gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 400)
-frame.Position = UDim2.new(0, 20, 0.5, -200)
+frame.Size = UDim2.new(0, 320, 0, 450)
+frame.Position = UDim2.new(0, 20, 0.5, -225)
 frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 frame.BorderColor3 = Color3.fromRGB(0, 255, 0)
 frame.Active = true
@@ -47,28 +47,26 @@ end
 local y = 40
 local buttons = {}
 
--- ✨ Супер прыжок
+-- 🦘 Супер прыжок
 buttons.superJump = createButton("🦘 Супер прыжок", y)
 y = y + 40
+local superJumpOn = false
 buttons.superJump.MouseButton1Click:Connect(function()
+	superJumpOn = not superJumpOn
 	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if hum then
-		hum.UseJumpPower = true
-		hum.JumpPower = 200
+		if superJumpOn then
+			hum.UseJumpPower = true
+			hum.JumpPower = 200
+			buttons.superJump.Text = "🦘 Супер прыжок ВКЛ"
+		else
+			hum.JumpPower = 50
+			buttons.superJump.Text = "🦘 Супер прыжок"
+		end
 	end
 end)
 
--- ✨ Сброс прыжка
-buttons.resetJump = createButton("♻️ Сброс прыжка", y)
-y = y + 40
-buttons.resetJump.MouseButton1Click:Connect(function()
-	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if hum then
-		hum.JumpPower = 50
-	end
-end)
-
--- ✨ Добавить монеты
+-- 💸 Добавить монеты
 buttons.addMoney = createButton("💸 Добавить монеты", y)
 y = y + 40
 buttons.addMoney.MouseButton1Click:Connect(function()
@@ -77,11 +75,11 @@ buttons.addMoney.MouseButton1Click:Connect(function()
 end)
 
 -- ✈️ Полёт
-local flyBtn = createButton("✈️ Полёт", y)
+buttons.fly = createButton("✈️ Полёт", y)
 y = y + 40
 local flying = false
 local flySpeed = 50
-local flyControl = {W=0,A=0,S=0,D=0}
+local flyControl = {W=0,A=0,S=0,D=0,Space=0}
 
 local function startFlying()
 	local char = player.Character
@@ -91,7 +89,7 @@ local function startFlying()
 	if humanoid then humanoid.PlatformStand = true end
 
 	RunService.Heartbeat:Connect(function()
-		if flying then
+		if flying and char.Parent then
 			local cam = workspace.CurrentCamera
 			local moveDir = (cam.CFrame.LookVector*flyControl.W + cam.CFrame.RightVector*flyControl.D
 				- cam.CFrame.LookVector*flyControl.S - cam.CFrame.RightVector*flyControl.A)
@@ -100,13 +98,13 @@ local function startFlying()
 	end)
 end
 
-flyBtn.MouseButton1Click:Connect(function()
+buttons.fly.MouseButton1Click:Connect(function()
 	flying = not flying
 	if flying then
-		flyBtn.Text = "✈️ Выключить полёт"
+		buttons.fly.Text = "✈️ Полёт ВКЛ"
 		startFlying()
 	else
-		flyBtn.Text = "✈️ Включить полёт"
+		buttons.fly.Text = "✈️ Полёт"
 		local char = player.Character
 		if char and char:FindFirstChildWhichIsA("Humanoid") then
 			char:FindFirstChildWhichIsA("Humanoid").PlatformStand = false
@@ -130,6 +128,52 @@ UserInputService.InputEnded:Connect(function(input, gpe)
 	if input.KeyCode == Enum.KeyCode.A then flyControl.A = 0 end
 	if input.KeyCode == Enum.KeyCode.D then flyControl.D = 0 end
 	if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.LeftShift then flyControl.Space = 0 end
+end)
+
+-- ⚡ Speedhack
+buttons.speed = createButton("⚡ Speedhack", y)
+y = y + 40
+local speedOn = false
+local normalSpeed = 16
+local boostedSpeed = 50
+buttons.speed.MouseButton1Click:Connect(function()
+	speedOn = not speedOn
+	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if hum then
+		if speedOn then
+			hum.WalkSpeed = boostedSpeed
+			buttons.speed.Text = "⚡ Speedhack ВКЛ"
+		else
+			hum.WalkSpeed = normalSpeed
+			buttons.speed.Text = "⚡ Speedhack"
+		end
+	end
+end)
+
+-- 🌀 Noclip
+buttons.noclip = createButton("🌀 Noclip", y)
+y = y + 40
+local noclipOn = false
+buttons.noclip.MouseButton1Click:Connect(function()
+	noclipOn = not noclipOn
+	if noclipOn then
+		buttons.noclip.Text = "🌀 Noclip ВКЛ"
+	else
+		buttons.noclip.Text = "🌀 Noclip"
+	end
+end)
+
+RunService.Stepped:Connect(function()
+	if noclipOn then
+		local char = player.Character
+		if char then
+			for _, part in pairs(char:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide = false
+				end
+			end
+		end
+	end
 end)
 
 -- 📊 Панель игроков (ник + HP + расстояние)
