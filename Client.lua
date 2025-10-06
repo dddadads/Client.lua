@@ -1,162 +1,113 @@
--- 📜 Хакерская панель GUI
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local player = Players.LocalPlayer
+-- 🌌 Панель хакера Roblox (улучшенная)
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
 
--- ⚙ Настройки
-local speedBoost = 50
-local jumpBoost = 150
-local noclipOn = false
-local speedOn = false
-local menuOpen = false
+-- Создание основного GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "HackerPanel"
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
 
--- 🟩 GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "HackerPanel"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
+-- Фон с 0 и 1
+local Background = Instance.new("Frame")
+Background.Size = UDim2.new(1, 0, 1, 0)
+Background.Position = UDim2.new(0, 0, 0, 0)
+Background.BackgroundColor3 = Color3.new(0, 0, 0)
+Background.BorderSizePixel = 0
+Background.ZIndex = 0
+Background.Parent = ScreenGui
 
--- 📦 Панель
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 320, 0, 400)
-frame.Position = UDim2.new(0.5, -160, 0.5, -200)
-frame.BackgroundColor3 = Color3.new(0, 0, 0)
-frame.BorderSizePixel = 0
-frame.Visible = false
-frame.Active = true
-frame.Draggable = true
-frame.Parent = gui
+-- Эффект анимированного 0 1
+local function createBinary()
+	for i = 1, 200 do
+		local txt = Instance.new("TextLabel")
+		txt.Text = math.random(0,1)
+		txt.TextColor3 = Color3.fromRGB(0, 255, 0)
+		txt.Font = Enum.Font.Code
+		txt.TextSize = 20
+		txt.BackgroundTransparency = 1
+		txt.Position = UDim2.new(math.random(), 0, math.random(), 0)
+		txt.Parent = Background
+		txt.ZIndex = 0
 
--- 🟢 Заголовок
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
-title.BackgroundColor3 = Color3.new(0, 0.2, 0)
-title.Text = "💻 HACKER PANEL 💻"
-title.TextColor3 = Color3.new(0, 1, 0)
-title.Font = Enum.Font.Code
-title.TextSize = 22
-title.Parent = frame
-
--- 🌌 Фон с 0 и 1
-local bg = Instance.new("TextLabel")
-bg.Size = UDim2.new(1, 0, 1, 0)
-bg.BackgroundTransparency = 1
-bg.Text = ""
-bg.TextColor3 = Color3.new(0, 1, 0)
-bg.Font = Enum.Font.Code
-bg.TextSize = 14
-bg.TextTransparency = 0.85
-bg.ZIndex = 0
-bg.Parent = frame
-
-task.spawn(function()
-	while true do
-		local t = ""
-		for i = 1, 500 do
-			t = t .. math.random(0, 1)
-		end
-		bg.Text = t
-		task.wait(0.1)
+		task.spawn(function()
+			while true do
+				txt.Text = math.random(0,1)
+				task.wait(0.1 + math.random() * 0.2)
+			end
+		end)
 	end
-end)
+end
+createBinary()
 
--- 🧰 Функция создания кнопок
-local yOffset = 50
-local function createButton(text, callback)
+-- Панель
+local Panel = Instance.new("Frame")
+Panel.Size = UDim2.new(0, 250, 0, 300)
+Panel.Position = UDim2.new(0, 20, 0.5, -150)
+Panel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Panel.BorderColor3 = Color3.fromRGB(0, 255, 0)
+Panel.ZIndex = 1
+Panel.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner", Panel)
+UICorner.CornerRadius = UDim.new(0, 10)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "🧠 Hacker Panel"
+Title.TextColor3 = Color3.fromRGB(0, 255, 0)
+Title.Font = Enum.Font.Code
+Title.TextSize = 20
+Title.BackgroundTransparency = 1
+Title.Parent = Panel
+
+-- 📌 Функции кнопок
+local function createButton(name, callback)
 	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1, -20, 0, 40)
-	btn.Position = UDim2.new(0, 10, 0, yOffset)
-	btn.BackgroundColor3 = Color3.new(0, 0.2, 0)
-	btn.TextColor3 = Color3.new(0, 1, 0)
+	btn.Size = UDim2.new(1, -20, 0, 30)
+	btn.Position = UDim2.new(0, 10, 0, #Panel:GetChildren() * 35)
+	btn.Text = name
+	btn.TextColor3 = Color3.fromRGB(0, 255, 0)
 	btn.Font = Enum.Font.Code
-	btn.TextSize = 20
-	btn.Text = text
-	btn.AutoButtonColor = true
-	btn.ZIndex = 1
-	btn.Parent = frame
+	btn.TextSize = 18
+	btn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+	btn.BorderColor3 = Color3.fromRGB(0, 255, 0)
+	btn.Parent = Panel
+
+	local corner = Instance.new("UICorner", btn)
+	corner.CornerRadius = UDim.new(0, 5)
 
 	btn.MouseButton1Click:Connect(callback)
-
-	yOffset = yOffset + 50
-	return btn
 end
 
--- ⚡ Скорость
-createButton("🚀 Скорость", function()
-	speedOn = not speedOn
-	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.WalkSpeed = speedOn and speedBoost or 16
+-- ✨ Функции
+createButton("💸 +Монеты", function()
+	local args = {"Money", 1000000000000}
+	game:GetService("ReplicatedStorage"):WaitForChild("ClaimReward"):FireServer(unpack(args))
+end)
+
+createButton("🦘 Супер прыжок", function()
+	local hum = player.Character:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.UseJumpPower = true
+		hum.JumpPower = 200
 	end
 end)
 
--- 🧱 Ноуклип
-createButton("🧱 Ноуклип", function()
-	noclipOn = not noclipOn
-end)
-
-RunService.Stepped:Connect(function()
-	if noclipOn and player.Character then
-		for _, part in pairs(player.Character:GetDescendants()) do
-			if part:IsA("BasePart") then
-				part.CanCollide = false
-			end
+createButton("👻 Невидимость (только клиент)", function()
+	for _, part in ipairs(player.Character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.Transparency = 1
+		elseif part:IsA("Decal") then
+			part.Transparency = 1
 		end
 	end
 end)
 
--- 🦘 Прыжок
-createButton("🦘 Высокий прыжок", function()
-	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.JumpPower = jumpBoost
-		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+createButton("♻️ Ресет прыжка", function()
+	local hum = player.Character:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.JumpPower = 50
 	end
 end)
-
--- 💰 Монеты
-local moneyBox = Instance.new("TextBox")
-moneyBox.Size = UDim2.new(1, -20, 0, 35)
-moneyBox.Position = UDim2.new(0, 10, 0, yOffset)
-moneyBox.PlaceholderText = "💰 Кол-во монет"
-moneyBox.BackgroundColor3 = Color3.new(0, 0.2, 0)
-moneyBox.TextColor3 = Color3.new(0, 1, 0)
-moneyBox.Font = Enum.Font.Code
-moneyBox.TextSize = 18
-moneyBox.Parent = frame
-
-yOffset = yOffset + 45
-
-createButton("Выдать монеты", function()
-	local amount = tonumber(moneyBox.Text)
-	if amount then
-		local args = { "Money", amount }
-		game:GetService("ReplicatedStorage"):WaitForChild("ClaimReward"):FireServer(unpack(args))
-	end
-end)
-
--- 🧭 Toggle G
-UserInputService.InputBegan:Connect(function(input, gpe)
-	if gpe then return end
-	if input.KeyCode == Enum.KeyCode.G then
-		menuOpen = not menuOpen
-		frame.Visible = menuOpen
-	end
-end)
-
--- ♻ Сброс при респавне
-player.CharacterAdded:Connect(function(char)
-	local hum = char:WaitForChild("Humanoid")
-	hum.WalkSpeed = 16
-	hum.JumpPower = 50
-	speedOn = false
-	noclipOn = false
-end)
-
--- 📌 Пример: как добавить новую кнопку позже
---[[
-createButton("🌟 Новая функция", function()
-	print("Сюда вставляешь код своей функции")
-end)
-]]
