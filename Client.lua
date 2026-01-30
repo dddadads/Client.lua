@@ -1,6 +1,6 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Configuration and State
+-- Конфигурация и Состояние
 local ScriptSettings = {
     WalkSpeed = 16,
     FlySpeed = 1,
@@ -17,7 +17,7 @@ local ScriptSettings = {
     Theme = "Default"
 }
 
--- Services
+-- Сервисы
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
 local RunService = game:GetService("RunService")
@@ -25,7 +25,7 @@ local UserInputService = game:GetService("UserInputService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Lighting = game:GetService("Lighting")
 
--- Save Default Lighting
+-- Сохранение стандартных настроек освещения
 local DefaultLighting = {
     Ambient = Lighting.Ambient,
     Brightness = Lighting.Brightness,
@@ -35,17 +35,17 @@ local DefaultLighting = {
     OutdoorAmbient = Lighting.OutdoorAmbient
 }
 
--- Variables
+-- Переменные
 local FlyBV, FlyBG
 local CachedObjects = {Computers = {}, Escapes = {}}
 
--- Get Game Info
+-- Информация об игре
 local gameName = "Unknown"
 pcall(function()
     gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
 end)
 
--- Create Window
+-- Создание окна
 local Window = Rayfield:CreateWindow({
     Name = "CoolHub | Five Nights: Hunted",
     Icon = 0,
@@ -59,13 +59,13 @@ local Window = Rayfield:CreateWindow({
     }
 })
 
--- Tabs
+-- Вкладки
 local InfoTab = Window:CreateTab("Инфо", "info")
 local PlayerTab = Window:CreateTab("Игрок", "user")
 local VisualsTab = Window:CreateTab("Визуалы", "eye")
 local SettingsTab = Window:CreateTab("Настройки", "settings")
 
--- --- OPTIMIZED ESP SYSTEM ---
+-- --- СИСТЕМА ESP ---
 local function ApplyESP(object, color, name, isComputer)
     if not object or object:FindFirstChild("Enhanced_ESP") then return end
     
@@ -126,7 +126,6 @@ local function ApplyESP(object, color, name, isComputer)
                     
                     if isComputer and ScriptSettings.ShowProgress then
                         local prog = object:GetAttribute("Progress") or 0
-                        -- Fix for 75% issue: 400 is max progress in FNH
                         local maxVal = (prog > 101) and 400 or 100
                         local percentage = math.clamp(math.floor((prog / maxVal) * 100), 0, 100)
                         finalString = finalString .. string.format("\nПрогресс: %d%%", percentage)
@@ -139,34 +138,32 @@ local function ApplyESP(object, color, name, isComputer)
     end)
 end
 
--- Map Caching Function
+-- Функция кэширования объектов
 local function RefreshMapCache()
     table.clear(CachedObjects.Computers)
     table.clear(CachedObjects.Escapes)
 
-    -- Trying to find the "карта" folder safely
-    local map = workspace:FindFirstChild("карта") or workspace:FindFirstChild("Map")
-    if map then
-        -- Computers in Task folder
-        local taskFolder = map:FindFirstChild("Task")
-        if taskFolder then
-            for _, obj in pairs(taskFolder:GetChildren()) do
-                table.insert(CachedObjects.Computers, obj)
+    for _, obj in pairs(workspace:GetDescendants()) do
+        -- Поиск компьютеров
+        if (obj:GetAttribute("Progress") ~= nil or obj.Name == "Meshes/t_Cube") then
+            local target = obj:IsA("Model") and obj or obj:FindFirstAncestorOfClass("Model")
+            if target and not table.find(CachedObjects.Computers, target) then
+                table.insert(CachedObjects.Computers, target)
             end
         end
-        -- Escapes in Escapes folder
-        local escapesFolder = map:FindFirstChild("Escapes")
-        if escapesFolder then
-            for _, obj in pairs(escapesFolder:GetChildren()) do
-                if obj:IsA("Model") then
-                    table.insert(CachedObjects.Escapes, obj)
-                end
+
+        -- Поиск выходов (теперь ищет Door_Plane в названии)
+        if obj.Name:find("Door_Plane") or obj.Name == "Escape" or obj.Name == "Exit" then
+            -- Ищем самую верхнюю модель в иерархии (в той самой "большой модельке")
+            local target = obj:IsA("Model") and obj or obj:FindFirstAncestorOfClass("Model")
+            if target and not table.find(CachedObjects.Escapes, target) then
+                table.insert(CachedObjects.Escapes, target)
             end
         end
     end
 end
 
--- --- PLAYER FUNCTIONS ---
+-- --- ФУНКЦИИ ИГРОКА ---
 local function ToggleFly(state)
     if state then
         local character = LP.Character
@@ -187,14 +184,13 @@ local function ToggleFly(state)
     end
 end
 
--- Infinite Jump
 UserInputService.JumpRequest:Connect(function()
     if ScriptSettings.InfJump and LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then
         LP.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
--- --- INFO TAB ---
+-- --- ВКЛАДКИ ---
 local InfoParagraph = InfoTab:CreateParagraph({Title = "Статус CoolHub", Content = "Загрузка..."})
 task.spawn(function()
     while true do
@@ -205,7 +201,6 @@ task.spawn(function()
     end
 end)
 
--- --- PLAYER TAB ---
 PlayerTab:CreateToggle({
     Name = "Noclip (Сквозь стены)",
     CurrentValue = false,
@@ -257,7 +252,6 @@ PlayerTab:CreateToggle({
     end
 })
 
--- --- VISUALS TAB ---
 VisualsTab:CreateToggle({
     Name = "ESP Игроков",
     CurrentValue = false,
@@ -304,25 +298,21 @@ VisualsTab:CreateToggle({
     end
 })
 
--- Optimized ESP Loop
+-- Цикл ESP
 task.spawn(function()
     while true do
-        -- Auto-refresh cache every 10 seconds to detect new round objects
         RefreshMapCache()
         
-        -- Players update
         if ScriptSettings.EspPlayers then
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then ApplyESP(p.Character, Color3.fromRGB(255, 80, 80), p.Name, false) end
             end
         end
         
-        -- Computers update
         if ScriptSettings.EspComputer then
             for _, obj in pairs(CachedObjects.Computers) do ApplyESP(obj, Color3.fromRGB(0, 255, 150), "Компьютер", true) end
         end
 
-        -- Escapes update
         if ScriptSettings.EspEscape then
             for _, obj in pairs(CachedObjects.Escapes) do ApplyESP(obj, Color3.fromRGB(255, 255, 0), "ВЫХОД", false) end
         end
@@ -331,17 +321,16 @@ task.spawn(function()
     end
 end)
 
--- --- SETTINGS TAB ---
 SettingsTab:CreateToggle({Name = "Дистанция", CurrentValue = false, Callback = function(v) ScriptSettings.ShowDistance = v end})
 SettingsTab:CreateToggle({Name = "Прогресс %", CurrentValue = false, Callback = function(v) ScriptSettings.ShowProgress = v end})
 
 SettingsTab:CreateButton({
-    Name = "Обновить Кэш Карты Вручную",
+    Name = "Обновить Кэш (Поиск объектов)",
     Callback = function() RefreshMapCache() end
 })
 
 Rayfield:Notify({
     Title = "CoolHub",
-    Content = "ESP настроен под структуру Task/Escapes. Ошибка 75% исправлена.",
+    Content = "ESP выходов обновлен: теперь ищет Door_Plane в моделях.",
     Duration = 5
 })
