@@ -1,6 +1,6 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Конфигурация и Состояние
+-- Configuration and State
 local ScriptSettings = {
     WalkSpeed = 16,
     FlySpeed = 1,
@@ -12,14 +12,12 @@ local ScriptSettings = {
     EspPlayers = false,
     EspComputer = false,
     EspEscape = false, 
-    EspLocker = false,
-    EspBallPit = false,
     ShowDistance = false,
     ShowProgress = false,
     Theme = "Default"
 }
 
--- Сервисы
+-- Services
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
 local RunService = game:GetService("RunService")
@@ -27,7 +25,7 @@ local UserInputService = game:GetService("UserInputService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Lighting = game:GetService("Lighting")
 
--- Сохранение стандартных настроек освещения для отката
+-- Save Default Lighting
 local DefaultLighting = {
     Ambient = Lighting.Ambient,
     Brightness = Lighting.Brightness,
@@ -37,24 +35,23 @@ local DefaultLighting = {
     OutdoorAmbient = Lighting.OutdoorAmbient
 }
 
--- Переменные для Fly
+-- Variables
 local FlyBV, FlyBG
+local CachedObjects = {Computers = {}, Escapes = {}}
 
--- Поиск информации об игре
+-- Get Game Info
 local gameName = "Unknown"
 pcall(function()
     gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
 end)
 
--- Создание окна
+-- Create Window
 local Window = Rayfield:CreateWindow({
     Name = "CoolHub | Five Nights: Hunted",
     Icon = 0,
     LoadingTitle = "CoolHub Loading...",
     LoadingSubtitle = "by coolguis119",
     Theme = ScriptSettings.Theme,
-    DisableRayfieldPrompts = false,
-    DisableBuildWarnings = false,
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "CoolHub_FNH",
@@ -62,13 +59,13 @@ local Window = Rayfield:CreateWindow({
     }
 })
 
--- Вкладки
+-- Tabs
 local InfoTab = Window:CreateTab("Инфо", "info")
 local PlayerTab = Window:CreateTab("Игрок", "user")
 local VisualsTab = Window:CreateTab("Визуалы", "eye")
 local SettingsTab = Window:CreateTab("Настройки", "settings")
 
--- --- УЛУЧШЕННАЯ СИСТЕМА ESP ---
+-- --- OPTIMIZED ESP SYSTEM ---
 local function ApplyESP(object, color, name, isComputer)
     if not object or object:FindFirstChild("Enhanced_ESP") then return end
     
@@ -106,34 +103,70 @@ local function ApplyESP(object, color, name, isComputer)
 
     task.spawn(function()
         while object and object.Parent and folder.Parent do
-            if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then 
-                task.wait(1)
+            local settingActive = false
+            if name == "Компьютер" then settingActive = ScriptSettings.EspComputer
+            elseif name == "ВЫХОД" then settingActive = ScriptSettings.EspEscape
+            else settingActive = ScriptSettings.EspPlayers end
+
+            if not settingActive then
+                highlight.Enabled = false
+                billboard.Enabled = false
             else
-                local root = LP.Character.HumanoidRootPart
-                local distance = (targetPart.Position - root.Position).Magnitude
+                highlight.Enabled = true
+                billboard.Enabled = true
                 
-                local finalString = name
-                if ScriptSettings.ShowDistance then
-                    finalString = finalString .. string.format(" [%dм]", math.floor(distance))
-                end
-                
-                if isComputer and ScriptSettings.ShowProgress then
-                    local prog = object:GetAttribute("Progress") or 0
-                    -- Фикс 75%: Если значение больше 105, значит максимум 400
-                    local maxVal = (prog > 105) and 400 or 100
+                if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                    local root = LP.Character.HumanoidRootPart
+                    local distance = (targetPart.Position - root.Position).Magnitude
                     
-                    local percentage = math.clamp(math.floor((prog / maxVal) * 100), 0, 100)
-                    finalString = finalString .. string.format("\nПрогресс: %d%%", percentage)
+                    local finalString = name
+                    if ScriptSettings.ShowDistance then
+                        finalString = finalString .. string.format(" [%dм]", math.floor(distance))
+                    end
+                    
+                    if isComputer and ScriptSettings.ShowProgress then
+                        local prog = object:GetAttribute("Progress") or 0
+                        -- Fix for 75% issue: 400 is max progress in FNH
+                        local maxVal = (prog > 101) and 400 or 100
+                        local percentage = math.clamp(math.floor((prog / maxVal) * 100), 0, 100)
+                        finalString = finalString .. string.format("\nПрогресс: %d%%", percentage)
+                    end
+                    label.Text = finalString
                 end
-                
-                label.Text = finalString
             end
-            task.wait(0.3)
+            task.wait(0.5)
         end
     end)
 end
 
--- --- ФУНКЦИИ ИГРОКА ---
+-- Map Caching Function
+local function RefreshMapCache()
+    table.clear(CachedObjects.Computers)
+    table.clear(CachedObjects.Escapes)
+
+    -- Trying to find the "карта" folder safely
+    local map = workspace:FindFirstChild("карта") or workspace:FindFirstChild("Map")
+    if map then
+        -- Computers in Task folder
+        local taskFolder = map:FindFirstChild("Task")
+        if taskFolder then
+            for _, obj in pairs(taskFolder:GetChildren()) do
+                table.insert(CachedObjects.Computers, obj)
+            end
+        end
+        -- Escapes in Escapes folder
+        local escapesFolder = map:FindFirstChild("Escapes")
+        if escapesFolder then
+            for _, obj in pairs(escapesFolder:GetChildren()) do
+                if obj:IsA("Model") then
+                    table.insert(CachedObjects.Escapes, obj)
+                end
+            end
+        end
+    end
+end
+
+-- --- PLAYER FUNCTIONS ---
 local function ToggleFly(state)
     if state then
         local character = LP.Character
@@ -154,29 +187,25 @@ local function ToggleFly(state)
     end
 end
 
--- Бесконечные прыжки
+-- Infinite Jump
 UserInputService.JumpRequest:Connect(function()
     if ScriptSettings.InfJump and LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then
         LP.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
--- --- ВКЛАДКА ИНФО ---
-local InfoParagraph = InfoTab:CreateParagraph({Title = "Статус CoolHub", Content = "Загрузка данных сервера..."})
+-- --- INFO TAB ---
+local InfoParagraph = InfoTab:CreateParagraph({Title = "Статус CoolHub", Content = "Загрузка..."})
 task.spawn(function()
     while true do
         pcall(function()
-            local content = string.format(
-                "👤 Автор: coolguis119\n🎮 Игра: %s\n🎮 Игроков: %d/%d\n🆔 Сервер: %s",
-                gameName, #Players:GetPlayers(), Players.MaxPlayers, game.JobId:sub(1,8)
-            )
-            InfoParagraph:Set({Title = "Статус CoolHub", Content = content})
+            InfoParagraph:Set({Title = "Статус CoolHub", Content = string.format("👤 Автор: coolguis119\n🎮 Игра: %s\n👥 Игроков: %d", gameName, #Players:GetPlayers())})
         end)
-        task.wait(3)
+        task.wait(5)
     end
 end)
 
--- --- ВКЛАДКА ИГРОК ---
+-- --- PLAYER TAB ---
 PlayerTab:CreateToggle({
     Name = "Noclip (Сквозь стены)",
     CurrentValue = false,
@@ -185,11 +214,9 @@ PlayerTab:CreateToggle({
         ScriptSettings.Noclip = Value
         if Value then
             RunService:BindToRenderStep("NoclipLoop", 1, function()
-                if LP.Character and LP.Character:FindFirstChild("Humanoid") then
-                    if LP.Character.Humanoid.Health > 0 then
-                        for _, part in pairs(LP.Character:GetDescendants()) do
-                            if part:IsA("BasePart") then part.CanCollide = false end
-                        end
+                if LP.Character then
+                    for _, part in pairs(LP.Character:GetDescendants()) do
+                        if part:IsA("BasePart") then part.CanCollide = false end
                     end
                 end
             end)
@@ -207,20 +234,18 @@ PlayerTab:CreateToggle({
 })
 
 PlayerTab:CreateSlider({
-    Name = "Скорость Бега",
+    Name = "Скорость",
     Range = {16, 120},
     Increment = 1,
     CurrentValue = 16,
-    Flag = "WS_Slider",
     Callback = function(v) ScriptSettings.WalkSpeed = v end
 })
 
 PlayerTab:CreateToggle({
-    Name = "Активировать Скорость",
+    Name = "Включить Скорость",
     CurrentValue = false,
-    Flag = "WS_Toggle",
-    Callback = function(Value)
-        ScriptSettings.SpeedEnabled = Value
+    Callback = function(v)
+        ScriptSettings.SpeedEnabled = v
         task.spawn(function()
             while ScriptSettings.SpeedEnabled do
                 if LP.Character and LP.Character:FindFirstChild("Humanoid") then
@@ -232,179 +257,91 @@ PlayerTab:CreateToggle({
     end
 })
 
-PlayerTab:CreateToggle({
-    Name = "Полет (Fly)",
-    CurrentValue = false,
-    Flag = "Fly_Toggle",
-    Callback = function(v) 
-        ScriptSettings.Fly = v 
-        ToggleFly(v)
-    end
-})
-
--- --- ВКЛАДКА ВИЗУАЛЫ ---
+-- --- VISUALS TAB ---
 VisualsTab:CreateToggle({
     Name = "ESP Игроков",
     CurrentValue = false,
-    Flag = "ESP_Players",
     Callback = function(v) ScriptSettings.EspPlayers = v end
 })
 
 VisualsTab:CreateToggle({
     Name = "ESP Компьютеров",
     CurrentValue = false,
-    Flag = "ESP_Computers",
-    Callback = function(v) ScriptSettings.EspComputer = v end
+    Callback = function(v) 
+        ScriptSettings.EspComputer = v 
+        if v then RefreshMapCache() end
+    end
 })
 
 VisualsTab:CreateToggle({
-    Name = "ESP Выхода (Escape)",
+    Name = "ESP Выходов",
     CurrentValue = false,
-    Flag = "ESP_Escape",
-    Callback = function(v) ScriptSettings.EspEscape = v end
+    Callback = function(v) 
+        ScriptSettings.EspEscape = v 
+        if v then RefreshMapCache() end
+    end
 })
 
 VisualsTab:CreateToggle({
-    Name = "ESP Шкафчиков",
+    Name = "Fullbright",
     CurrentValue = false,
-    Flag = "ESP_Lockers",
-    Callback = function(v) ScriptSettings.EspLocker = v end
-})
-
-VisualsTab:CreateToggle({
-    Name = "ESP Ям с шариками",
-    CurrentValue = false,
-    Flag = "ESP_BallPits",
-    Callback = function(v) ScriptSettings.EspBallPit = v end
-})
-
-VisualsTab:CreateToggle({
-    Name = "Super Fullbright (Ночное зрение)",
-    CurrentValue = false,
-    Flag = "FullbrightFlag",
     Callback = function(v)
         ScriptSettings.Fullbright = v
         if v then
             task.spawn(function()
                 while ScriptSettings.Fullbright do
-                    Lighting.Ambient = Color3.new(1, 1, 1)
-                    Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
                     Lighting.Brightness = 2
                     Lighting.ClockTime = 14
-                    Lighting.FogEnd = 100000
                     Lighting.GlobalShadows = false
-                    task.wait(0.5)
+                    task.wait(1)
                 end
             end)
         else
-            Lighting.Ambient = DefaultLighting.Ambient
-            Lighting.OutdoorAmbient = DefaultLighting.OutdoorAmbient
             Lighting.Brightness = DefaultLighting.Brightness
             Lighting.ClockTime = DefaultLighting.ClockTime
-            Lighting.FogEnd = DefaultLighting.FogEnd
             Lighting.GlobalShadows = DefaultLighting.GlobalShadows
         end
     end
 })
 
--- Цикл обновления ESP
+-- Optimized ESP Loop
 task.spawn(function()
     while true do
+        -- Auto-refresh cache every 10 seconds to detect new round objects
+        RefreshMapCache()
+        
+        -- Players update
         if ScriptSettings.EspPlayers then
             for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LP and p.Character then
-                    ApplyESP(p.Character, Color3.fromRGB(255, 80, 80), p.Name, false)
-                end
+                if p ~= LP and p.Character then ApplyESP(p.Character, Color3.fromRGB(255, 80, 80), p.Name, false) end
             end
         end
         
+        -- Computers update
         if ScriptSettings.EspComputer then
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if (obj.Name == "Meshes/t_Cube" or obj:GetAttribute("Progress")) and obj.Parent:IsA("Model") then
-                    ApplyESP(obj.Parent, Color3.fromRGB(0, 255, 150), "Компьютер", true)
-                end
-            end
+            for _, obj in pairs(CachedObjects.Computers) do ApplyESP(obj, Color3.fromRGB(0, 255, 150), "Компьютер", true) end
         end
 
+        -- Escapes update
         if ScriptSettings.EspEscape then
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj.Name == "Escape" or obj.Name == "EscapeDoor" or obj.Name == "Exit" then
-                    local target = obj:IsA("Model") and obj or obj.Parent
-                    ApplyESP(target, Color3.fromRGB(255, 255, 0), "ВЫХОД", false)
-                end
-            end
+            for _, obj in pairs(CachedObjects.Escapes) do ApplyESP(obj, Color3.fromRGB(255, 255, 0), "ВЫХОД", false) end
         end
 
-        if ScriptSettings.EspLocker then
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj.Name == "Locker" or obj.Name == "Closet" then
-                    local target = obj:IsA("Model") and obj or obj.Parent
-                    ApplyESP(target, Color3.fromRGB(150, 150, 150), "Шкафчик", false)
-                end
-            end
-        end
-
-        if ScriptSettings.EspBallPit then
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj.Name == "BallPit" or obj.Name == "Ball Pit" then
-                    local target = obj:IsA("Model") and obj or obj.Parent
-                    ApplyESP(target, Color3.fromRGB(255, 100, 255), "Яма с шариками", false)
-                end
-            end
-        end
-        task.wait(2)
+        task.wait(10)
     end
 end)
 
--- --- НАСТРОЙКИ ---
-SettingsTab:CreateToggle({
-    Name = "Показывать Дистанцию",
-    CurrentValue = false,
-    Flag = "Dist_Toggle",
-    Callback = function(v) ScriptSettings.ShowDistance = v end
-})
-
-SettingsTab:CreateToggle({
-    Name = "Прогресс Компьютеров",
-    CurrentValue = false,
-    Flag = "Prog_Toggle",
-    Callback = function(v) ScriptSettings.ShowProgress = v end
-})
+-- --- SETTINGS TAB ---
+SettingsTab:CreateToggle({Name = "Дистанция", CurrentValue = false, Callback = function(v) ScriptSettings.ShowDistance = v end})
+SettingsTab:CreateToggle({Name = "Прогресс %", CurrentValue = false, Callback = function(v) ScriptSettings.ShowProgress = v end})
 
 SettingsTab:CreateButton({
-    Name = "Выгрузить Скрипт",
-    Callback = function()
-        ScriptSettings.Noclip = false
-        ScriptSettings.Fly = false
-        ScriptSettings.InfJump = false
-        ScriptSettings.Fullbright = false
-        ToggleFly(false)
-        RunService:UnbindFromRenderStep("NoclipLoop")
-        Rayfield:Destroy()
-    end
+    Name = "Обновить Кэш Карты Вручную",
+    Callback = function() RefreshMapCache() end
 })
-
--- Управление полетом
-RunService.RenderStepped:Connect(function()
-    if ScriptSettings.Fly and FlyBV and FlyBG and LP.Character then
-        local cam = workspace.CurrentCamera.CFrame
-        local moveDir = Vector3.zero
-        
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += cam.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= cam.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= cam.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += cam.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0,1,0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir -= Vector3.new(0,1,0) end
-
-        FlyBV.Velocity = moveDir * (ScriptSettings.FlySpeed * 50)
-        FlyBG.CFrame = cam
-    end
-end)
 
 Rayfield:Notify({
     Title = "CoolHub",
-    Content = "Canvas обновлен: добавлены шкафчики и бассейны!",
-    Duration = 5,
-    Image = 4483362458,
+    Content = "ESP настроен под структуру Task/Escapes. Ошибка 75% исправлена.",
+    Duration = 5
 })
