@@ -16,7 +16,7 @@ local ScriptSettings = {
     FieldOfView = 70,
     AntiAFK = true,
     AutoInteract = false,
-    InstantInteraction = false, -- Новая настройка
+    InstantInteraction = false,
     Theme = "Default"
 }
 
@@ -30,7 +30,7 @@ local Lighting = game:GetService("Lighting")
 
 -- Переменные
 local CachedObjects = {Computers = {}}
-local OriginalHoldDurations = {} -- Для возврата стандартных настроек
+local OriginalHoldDurations = {}
 
 -- Anti-AFK
 for i,v in pairs(getconnections(LP.Idled)) do
@@ -260,17 +260,20 @@ MiscTab:CreateToggle({
     Callback = function(v)
         ScriptSettings.InstantInteraction = v
         if v then
-            -- Делаем взаимодействие мгновенным
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj:IsA("ProximityPrompt") then
-                    if not OriginalHoldDurations[obj] then
-                        OriginalHoldDurations[obj] = obj.HoldDuration
+            task.spawn(function()
+                while ScriptSettings.InstantInteraction do
+                    for _, obj in pairs(workspace:GetDescendants()) do
+                        if obj:IsA("ProximityPrompt") then
+                            if not OriginalHoldDurations[obj] then
+                                OriginalHoldDurations[obj] = obj.HoldDuration
+                            end
+                            obj.HoldDuration = 0
+                        end
                     end
-                    obj.HoldDuration = 0
+                    task.wait(1)
                 end
-            end
+            end)
         else
-            -- Возвращаем как было
             for obj, duration in pairs(OriginalHoldDurations) do
                 if obj and obj.Parent then
                     obj.HoldDuration = duration
