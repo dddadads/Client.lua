@@ -1,211 +1,365 @@
--- 🌌 Хакерская панель Roblox (локальный скрипт)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Конфигурация и Состояние
+local ScriptSettings = {
+    WalkSpeed = 16,
+    FlySpeed = 1,
+    Noclip = false,
+    Fly = false,
+    SpeedEnabled = false,
+    InfJump = false,
+    Fullbright = false,
+    EspPlayers = false,
+    EspComputer = false,
+    EspLocker = false,
+    EspBallPit = false,
+    ShowDistance = false,
+    ShowProgress = false,
+    Theme = "Default"
+}
+
+-- Сервисы
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local player = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local Lighting = game:GetService("Lighting")
 
--- GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "HackerPanel"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
+-- Сохранение стандартных настроек освещения для отката
+local DefaultLighting = {
+    Ambient = Lighting.Ambient,
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows,
+    OutdoorAmbient = Lighting.OutdoorAmbient
+}
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 320, 0, 450)
-frame.Position = UDim2.new(0, 20, 0.5, -225)
-frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-frame.BorderColor3 = Color3.fromRGB(0, 255, 0)
-frame.Active = true
-frame.Draggable = true
-frame.Parent = gui
+-- Переменные для Fly
+local FlyBV, FlyBG
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-title.Text = "💻 Hacker Panel"
-title.TextColor3 = Color3.fromRGB(0, 255, 0)
-title.Font = Enum.Font.Code
-title.TextSize = 18
-title.Parent = frame
+-- Поиск информации об игре
+local gameName = "Unknown"
+pcall(function()
+    gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
+end)
 
--- Кнопки
-local function createButton(name, yPos)
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1, -20, 0, 35)
-	btn.Position = UDim2.new(0, 10, 0, yPos)
-	btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-	btn.BorderColor3 = Color3.fromRGB(0, 255, 0)
-	btn.Text = name
-	btn.TextColor3 = Color3.fromRGB(0, 255, 0)
-	btn.Font = Enum.Font.Code
-	btn.TextSize = 16
-	btn.Parent = frame
-	return btn
+-- Создание окна с твоим авторством
+local Window = Rayfield:CreateWindow({
+    Name = "CoolHub | Five Nights: Hunted",
+    Icon = 0,
+    LoadingTitle = "CoolHub Loading...",
+    LoadingSubtitle = "by coolguis119",
+    Theme = ScriptSettings.Theme,
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "CoolHub_FNH",
+        FileName = "Config"
+    }
+})
+
+-- Вкладки
+local InfoTab = Window:CreateTab("Инфо", 4483362458)
+local PlayerTab = Window:CreateTab("Игрок", 4483362458)
+local VisualsTab = Window:CreateTab("Визуалы", 4483362458)
+local SettingsTab = Window:CreateTab("Настройки", 4483362458)
+
+-- --- УЛУЧШЕННАЯ СИСТЕМА ESP ---
+local function ApplyESP(object, color, name, isComputer)
+    if not object or object:FindFirstChild("Enhanced_ESP") then return end
+    
+    local targetPart = object:IsA("Model") and (object.PrimaryPart or object:FindFirstChildWhichIsA("BasePart")) or object
+    if not targetPart then return end
+
+    local folder = Instance.new("Folder")
+    folder.Name = "Enhanced_ESP"
+    folder.Parent = object
+
+    local highlight = Instance.new("Highlight")
+    highlight.FillColor = color
+    highlight.OutlineColor = Color3.new(1,1,1)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Adornee = object
+    highlight.Parent = folder
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0, 150, 0, 50)
+    billboard.AlwaysOnTop = true
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.Adornee = targetPart
+    billboard.Parent = folder
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = color
+    label.TextStrokeTransparency = 0.5
+    label.Font = Enum.Font.SourceSansBold
+    label.TextScaled = true
+    label.Text = name
+    label.Parent = billboard
+
+    task.spawn(function()
+        while object and object.Parent and folder.Parent do
+            if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then 
+                task.wait(1)
+            else
+                local root = LP.Character.HumanoidRootPart
+                local distance = (targetPart.Position - root.Position).Magnitude
+                
+                local finalString = name
+                if ScriptSettings.ShowDistance then
+                    finalString = finalString .. string.format(" [%dм]", math.floor(distance))
+                end
+                
+                if isComputer and ScriptSettings.ShowProgress then
+                    local prog = object:GetAttribute("Progress") or 0
+                    local maxVal = (prog > 105) and 400 or 100
+                    local percentage = math.clamp(math.floor((prog / maxVal) * 100), 0, 100)
+                    
+                    finalString = finalString .. string.format("\nПрогресс: %d%%", percentage)
+                end
+                
+                label.Text = finalString
+            end
+            task.wait(0.3)
+        end
+    end)
 end
 
-local y = 40
-local buttons = {}
-
--- 🦘 Супер прыжок
-buttons.superJump = createButton("🦘 Супер прыжок", y)
-y = y + 40
-local superJumpOn = false
-buttons.superJump.MouseButton1Click:Connect(function()
-	superJumpOn = not superJumpOn
-	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if hum then
-		if superJumpOn then
-			hum.UseJumpPower = true
-			hum.JumpPower = 200
-			buttons.superJump.Text = "🦘 Супер прыжок ВКЛ"
-		else
-			hum.JumpPower = 50
-			buttons.superJump.Text = "🦘 Супер прыжок"
-		end
-	end
-end)
-
--- 💸 Добавить монеты
-buttons.addMoney = createButton("💸 Добавить монеты", y)
-y = y + 40
-buttons.addMoney.MouseButton1Click:Connect(function()
-	local args = {"Money", 1000000000}
-	ReplicatedStorage:WaitForChild("ClaimReward"):FireServer(unpack(args))
-end)
-
--- ✈️ Полёт
-buttons.fly = createButton("✈️ Полёт", y)
-y = y + 40
-local flying = false
-local flySpeed = 50
-local flyControl = {W=0,A=0,S=0,D=0,Space=0}
-
-local function startFlying()
-	local char = player.Character
-	if not char then return end
-	local root = char:WaitForChild("HumanoidRootPart")
-	local humanoid = char:FindFirstChildWhichIsA("Humanoid")
-	if humanoid then humanoid.PlatformStand = true end
-
-	RunService.Heartbeat:Connect(function()
-		if flying and char.Parent then
-			local cam = workspace.CurrentCamera
-			local moveDir = (cam.CFrame.LookVector*flyControl.W + cam.CFrame.RightVector*flyControl.D
-				- cam.CFrame.LookVector*flyControl.S - cam.CFrame.RightVector*flyControl.A)
-			root.Velocity = moveDir*flySpeed + Vector3.new(0, flyControl.Space*flySpeed,0)
-		end
-	end)
+-- --- ФУНКЦИИ ИГРОКА ---
+local function ToggleFly(state)
+    if state then
+        local character = LP.Character
+        if not character then return end
+        local root = character:WaitForChild("HumanoidRootPart")
+        FlyBV = Instance.new("BodyVelocity", root)
+        FlyBG = Instance.new("BodyGyro", root)
+        FlyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        FlyBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        FlyBV.Velocity = Vector3.zero
+        character.Humanoid.PlatformStand = true
+    else
+        if FlyBV then FlyBV:Destroy() end
+        if FlyBG then FlyBG:Destroy() end
+        if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+            LP.Character.Humanoid.PlatformStand = false
+        end
+    end
 end
 
-buttons.fly.MouseButton1Click:Connect(function()
-	flying = not flying
-	if flying then
-		buttons.fly.Text = "✈️ Полёт ВКЛ"
-		startFlying()
-	else
-		buttons.fly.Text = "✈️ Полёт"
-		local char = player.Character
-		if char and char:FindFirstChildWhichIsA("Humanoid") then
-			char:FindFirstChildWhichIsA("Humanoid").PlatformStand = false
-		end
-	end
+-- Бесконечные прыжки
+UserInputService.JumpRequest:Connect(function()
+    if ScriptSettings.InfJump and LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then
+        LP.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+    end
 end)
 
-UserInputService.InputBegan:Connect(function(input, gpe)
-	if gpe then return end
-	if input.KeyCode == Enum.KeyCode.W then flyControl.W = 1 end
-	if input.KeyCode == Enum.KeyCode.S then flyControl.S = 1 end
-	if input.KeyCode == Enum.KeyCode.A then flyControl.A = 1 end
-	if input.KeyCode == Enum.KeyCode.D then flyControl.D = 1 end
-	if input.KeyCode == Enum.KeyCode.Space then flyControl.Space = 1 end
-	if input.KeyCode == Enum.KeyCode.LeftShift then flyControl.Space = -1 end
+-- --- ВКЛАДКА ИНФО ---
+local InfoParagraph = InfoTab:CreateParagraph({Title = "Статус CoolHub", Content = "Обновление..."})
+task.spawn(function()
+    while true do
+        pcall(function()
+            local content = string.format(
+                "👤 Автор: coolguis119\n🎮 Игра: %s\n👥 Игроков: %d/%d\n🆔 Сервер: %s",
+                gameName, #Players:GetPlayers(), Players.MaxPlayers, game.JobId:sub(1,8)
+            )
+            InfoParagraph:Set({Title = "Статус CoolHub", Content = content})
+        end)
+        task.wait(3)
+    end
 end)
 
-UserInputService.InputEnded:Connect(function(input, gpe)
-	if input.KeyCode == Enum.KeyCode.W then flyControl.W = 0 end
-	if input.KeyCode == Enum.KeyCode.S then flyControl.S = 0 end
-	if input.KeyCode == Enum.KeyCode.A then flyControl.A = 0 end
-	if input.KeyCode == Enum.KeyCode.D then flyControl.D = 0 end
-	if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.LeftShift then flyControl.Space = 0 end
+-- --- ВКЛАДКА ИГРОК ---
+PlayerTab:CreateToggle({
+    Name = "Noclip (Сквозь стены)",
+    CurrentValue = false,
+    Flag = "NoclipFlag",
+    Callback = function(Value)
+        ScriptSettings.Noclip = Value
+        if Value then
+            RunService:BindToRenderStep("NoclipLoop", 1, function()
+                if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+                    -- Проверка HP: если 0, то ноклип не работает (защита от падения под карту)
+                    if LP.Character.Humanoid.Health > 0 then
+                        for _, part in pairs(LP.Character:GetDescendants()) do
+                            if part:IsA("BasePart") then part.CanCollide = false end
+                        end
+                    end
+                end
+            end)
+        else
+            RunService:UnbindFromRenderStep("NoclipLoop")
+        end
+    end
+})
+
+PlayerTab:CreateToggle({
+    Name = "Бесконечные Прыжки",
+    CurrentValue = false,
+    Flag = "InfJumpFlag",
+    Callback = function(v) ScriptSettings.InfJump = v end
+})
+
+PlayerTab:CreateSlider({
+    Name = "Скорость Бега",
+    Range = {16, 120},
+    Increment = 1,
+    CurrentValue = 16,
+    Flag = "WS_Slider",
+    Callback = function(v) ScriptSettings.WalkSpeed = v end
+})
+
+PlayerTab:CreateToggle({
+    Name = "Активировать Скорость",
+    CurrentValue = false,
+    Flag = "WS_Toggle",
+    Callback = function(Value)
+        ScriptSettings.SpeedEnabled = Value
+        task.spawn(function()
+            while ScriptSettings.SpeedEnabled do
+                if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+                    LP.Character.Humanoid.WalkSpeed = ScriptSettings.WalkSpeed
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+})
+
+PlayerTab:CreateToggle({
+    Name = "Полет (Fly)",
+    CurrentValue = false,
+    Flag = "Fly_Toggle",
+    Callback = function(v) 
+        ScriptSettings.Fly = v 
+        ToggleFly(v)
+    end
+})
+
+-- --- ВКЛАДКА ВИЗУАЛЫ ---
+VisualsTab:CreateToggle({
+    Name = "Super Fullbright (Ночное зрение)",
+    CurrentValue = false,
+    Flag = "FullbrightFlag",
+    Callback = function(v)
+        ScriptSettings.Fullbright = v
+        if v then
+            task.spawn(function()
+                while ScriptSettings.Fullbright do
+                    Lighting.Ambient = Color3.new(1, 1, 1)
+                    Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+                    Lighting.Brightness = 2
+                    Lighting.ClockTime = 14
+                    Lighting.FogEnd = 100000
+                    Lighting.GlobalShadows = false
+                    task.wait(0.5)
+                end
+            end)
+        else
+            Lighting.Ambient = DefaultLighting.Ambient
+            Lighting.OutdoorAmbient = DefaultLighting.OutdoorAmbient
+            Lighting.Brightness = DefaultLighting.Brightness
+            Lighting.ClockTime = DefaultLighting.ClockTime
+            Lighting.FogEnd = DefaultLighting.FogEnd
+            Lighting.GlobalShadows = DefaultLighting.GlobalShadows
+        end
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Игроков",
+    CurrentValue = false,
+    Flag = "ESP_Players",
+    Callback = function(v)
+        ScriptSettings.EspPlayers = v
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Компьютеров",
+    CurrentValue = false,
+    Flag = "ESP_Computers",
+    Callback = function(v)
+        ScriptSettings.EspComputer = v
+    end
+})
+
+-- Цикл обновления ESP
+task.spawn(function()
+    while true do
+        if ScriptSettings.EspPlayers then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character then
+                    ApplyESP(p.Character, Color3.fromRGB(255, 80, 80), p.Name, false)
+                end
+            end
+        end
+        
+        if ScriptSettings.EspComputer then
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if (obj.Name == "Meshes/t_Cube" or obj:GetAttribute("Progress")) and obj.Parent:IsA("Model") then
+                    ApplyESP(obj.Parent, Color3.fromRGB(0, 255, 150), "Компьютер", true)
+                end
+            end
+        end
+        task.wait(2)
+    end
 end)
 
--- ⚡ Speedhack
-buttons.speed = createButton("⚡ Speedhack", y)
-y = y + 40
-local speedOn = false
-local normalSpeed = 16
-local boostedSpeed = 50
-buttons.speed.MouseButton1Click:Connect(function()
-	speedOn = not speedOn
-	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if hum then
-		if speedOn then
-			hum.WalkSpeed = boostedSpeed
-			buttons.speed.Text = "⚡ Speedhack ВКЛ"
-		else
-			hum.WalkSpeed = normalSpeed
-			buttons.speed.Text = "⚡ Speedhack"
-		end
-	end
+-- --- НАСТРОЙКИ ---
+SettingsTab:CreateToggle({
+    Name = "Показывать Дистанцию",
+    CurrentValue = false,
+    Flag = "Dist_Toggle",
+    Callback = function(v) ScriptSettings.ShowDistance = v end
+})
+
+SettingsTab:CreateToggle({
+    Name = "Прогресс Компьютеров",
+    CurrentValue = false,
+    Flag = "Prog_Toggle",
+    Callback = function(v) ScriptSettings.ShowProgress = v end
+})
+
+SettingsTab:CreateButton({
+    Name = "Выгрузить Скрипт",
+    Callback = function()
+        ScriptSettings.Noclip = false
+        ScriptSettings.Fly = false
+        ScriptSettings.InfJump = false
+        ScriptSettings.Fullbright = false
+        ToggleFly(false)
+        RunService:UnbindFromRenderStep("NoclipLoop")
+        Rayfield:Destroy()
+    end
+})
+
+-- Управление полетом
+RunService.RenderStepped:Connect(function()
+    if ScriptSettings.Fly and FlyBV and FlyBG and LP.Character then
+        local cam = workspace.CurrentCamera.CFrame
+        local moveDir = Vector3.zero
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += cam.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= cam.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= cam.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += cam.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir -= Vector3.new(0,1,0) end
+
+        FlyBV.Velocity = moveDir * (ScriptSettings.FlySpeed * 50)
+        FlyBG.CFrame = cam
+    end
 end)
 
--- 🌀 Noclip
-buttons.noclip = createButton("🌀 Noclip", y)
-y = y + 40
-local noclipOn = false
-buttons.noclip.MouseButton1Click:Connect(function()
-	noclipOn = not noclipOn
-	if noclipOn then
-		buttons.noclip.Text = "🌀 Noclip ВКЛ"
-	else
-		buttons.noclip.Text = "🌀 Noclip"
-	end
-end)
-
-RunService.Stepped:Connect(function()
-	if noclipOn then
-		local char = player.Character
-		if char then
-			for _, part in pairs(char:GetDescendants()) do
-				if part:IsA("BasePart") then
-					part.CanCollide = false
-				end
-			end
-		end
-	end
-end)
-
--- 📊 Панель игроков (ник + HP + расстояние)
-local infoFrame = Instance.new("ScrollingFrame")
-infoFrame.Size = UDim2.new(1, -20, 0, 120)
-infoFrame.Position = UDim2.new(0, 10, 0, y)
-infoFrame.BackgroundColor3 = Color3.fromRGB(0,0,0)
-infoFrame.BorderColor3 = Color3.fromRGB(0,255,0)
-infoFrame.ScrollBarThickness = 5
-infoFrame.Parent = frame
-
-local function updatePlayerInfo()
-	infoFrame:ClearAllChildren()
-	local yOffset = 0
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-			local hum = plr.Character:FindFirstChildWhichIsA("Humanoid")
-			if hum then
-				local lbl = Instance.new("TextLabel")
-				lbl.Size = UDim2.new(1, -10, 0, 20)
-				lbl.Position = UDim2.new(0, 5, 0, yOffset)
-				lbl.BackgroundTransparency = 1
-				lbl.TextColor3 = Color3.fromRGB(0,255,0)
-				lbl.Font = Enum.Font.Code
-				lbl.TextSize = 14
-				local dist = (player.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-				lbl.Text = plr.Name.." | HP: "..math.floor(hum.Health).."/"..math.floor(hum.MaxHealth).." | "..math.floor(dist).." studs"
-				lbl.Parent = infoFrame
-				yOffset = yOffset + 22
-			end
-		end
-	end
-end
-
-RunService.RenderStepped:Connect(updatePlayerInfo)
+Rayfield:Notify({
+    Title = "CoolHub",
+    Content = "Защита Noclip добавлена!",
+    Duration = 5,
+    Image = 4483362458,
+})
