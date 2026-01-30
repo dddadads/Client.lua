@@ -11,7 +11,6 @@ local ScriptSettings = {
     Fullbright = false,
     EspPlayers = false,
     EspComputer = false,
-    EspEscape = false, 
     ShowDistance = false,
     ShowProgress = false,
     Theme = "Default"
@@ -37,7 +36,7 @@ local DefaultLighting = {
 
 -- Переменные
 local FlyBV, FlyBG
-local CachedObjects = {Computers = {}, Escapes = {}}
+local CachedObjects = {Computers = {}}
 
 -- Информация об игре
 local gameName = "Unknown"
@@ -105,7 +104,6 @@ local function ApplyESP(object, color, name, isComputer)
         while object and object.Parent and folder.Parent do
             local settingActive = false
             if name == "Компьютер" then settingActive = ScriptSettings.EspComputer
-            elseif name == "ВЫХОД" then settingActive = ScriptSettings.EspEscape
             else settingActive = ScriptSettings.EspPlayers end
 
             if not settingActive then
@@ -141,7 +139,6 @@ end
 -- Функция кэширования объектов
 local function RefreshMapCache()
     table.clear(CachedObjects.Computers)
-    table.clear(CachedObjects.Escapes)
 
     for _, obj in pairs(workspace:GetDescendants()) do
         -- Поиск компьютеров
@@ -151,39 +148,10 @@ local function RefreshMapCache()
                 table.insert(CachedObjects.Computers, target)
             end
         end
-
-        -- Поиск выходов (теперь ищет Door_Plane в названии)
-        if obj.Name:find("Door_Plane") or obj.Name == "Escape" or obj.Name == "Exit" then
-            -- Ищем самую верхнюю модель в иерархии (в той самой "большой модельке")
-            local target = obj:IsA("Model") and obj or obj:FindFirstAncestorOfClass("Model")
-            if target and not table.find(CachedObjects.Escapes, target) then
-                table.insert(CachedObjects.Escapes, target)
-            end
-        end
     end
 end
 
 -- --- ФУНКЦИИ ИГРОКА ---
-local function ToggleFly(state)
-    if state then
-        local character = LP.Character
-        if not character then return end
-        local root = character:WaitForChild("HumanoidRootPart")
-        FlyBV = Instance.new("BodyVelocity", root)
-        FlyBG = Instance.new("BodyGyro", root)
-        FlyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-        FlyBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-        FlyBV.Velocity = Vector3.zero
-        character.Humanoid.PlatformStand = true
-    else
-        if FlyBV then FlyBV:Destroy() end
-        if FlyBG then FlyBG:Destroy() end
-        if LP.Character and LP.Character:FindFirstChild("Humanoid") then
-            LP.Character.Humanoid.PlatformStand = false
-        end
-    end
-end
-
 UserInputService.JumpRequest:Connect(function()
     if ScriptSettings.InfJump and LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then
         LP.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
@@ -200,6 +168,55 @@ task.spawn(function()
         task.wait(5)
     end
 end)
+
+PlayerTab:CreateInput({
+    Name = "Установить Скорость",
+    PlaceholderText = "Введите число (напр. 50)",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        local num = tonumber(Text)
+        if num then
+            ScriptSettings.WalkSpeed = num
+            Rayfield:Notify({Title = "Скорость", Content = "Установлено: " .. num, Duration = 2})
+        else
+            Rayfield:Notify({Title = "Ошибка", Content = "Введите корректное число!", Duration = 2})
+        end
+    end,
+})
+
+PlayerTab:CreateToggle({
+    Name = "Включить Скорость",
+    CurrentValue = false,
+    Callback = function(v)
+        ScriptSettings.SpeedEnabled = v
+        task.spawn(function()
+            while ScriptSettings.SpeedEnabled do
+                if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+                    LP.Character.Humanoid.WalkSpeed = ScriptSettings.WalkSpeed
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Clear Barriers (Удалить барьеры)",
+    Callback = function()
+        local found = false
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj.Name == "Barriers" and (obj:IsA("Folder") or obj:IsA("Model")) then
+                obj:Destroy()
+                found = true
+            end
+        end
+        if found then
+            Rayfield:Notify({Title = "Успех", Content = "Все папки Barriers удалены!", Duration = 3})
+        else
+            Rayfield:Notify({Title = "Инфо", Content = "Папки Barriers не найдены.", Duration = 3})
+        end
+    end
+})
 
 PlayerTab:CreateToggle({
     Name = "Noclip (Сквозь стены)",
@@ -228,30 +245,6 @@ PlayerTab:CreateToggle({
     Callback = function(v) ScriptSettings.InfJump = v end
 })
 
-PlayerTab:CreateSlider({
-    Name = "Скорость",
-    Range = {16, 120},
-    Increment = 1,
-    CurrentValue = 16,
-    Callback = function(v) ScriptSettings.WalkSpeed = v end
-})
-
-PlayerTab:CreateToggle({
-    Name = "Включить Скорость",
-    CurrentValue = false,
-    Callback = function(v)
-        ScriptSettings.SpeedEnabled = v
-        task.spawn(function()
-            while ScriptSettings.SpeedEnabled do
-                if LP.Character and LP.Character:FindFirstChild("Humanoid") then
-                    LP.Character.Humanoid.WalkSpeed = ScriptSettings.WalkSpeed
-                end
-                task.wait(0.1)
-            end
-        end)
-    end
-})
-
 VisualsTab:CreateToggle({
     Name = "ESP Игроков",
     CurrentValue = false,
@@ -263,15 +256,6 @@ VisualsTab:CreateToggle({
     CurrentValue = false,
     Callback = function(v) 
         ScriptSettings.EspComputer = v 
-        if v then RefreshMapCache() end
-    end
-})
-
-VisualsTab:CreateToggle({
-    Name = "ESP Выходов",
-    CurrentValue = false,
-    Callback = function(v) 
-        ScriptSettings.EspEscape = v 
         if v then RefreshMapCache() end
     end
 })
@@ -313,10 +297,6 @@ task.spawn(function()
             for _, obj in pairs(CachedObjects.Computers) do ApplyESP(obj, Color3.fromRGB(0, 255, 150), "Компьютер", true) end
         end
 
-        if ScriptSettings.EspEscape then
-            for _, obj in pairs(CachedObjects.Escapes) do ApplyESP(obj, Color3.fromRGB(255, 255, 0), "ВЫХОД", false) end
-        end
-
         task.wait(10)
     end
 end)
@@ -331,6 +311,6 @@ SettingsTab:CreateButton({
 
 Rayfield:Notify({
     Title = "CoolHub",
-    Content = "ESP выходов обновлен: теперь ищет Door_Plane в моделях.",
+    Content = "Функции обновлены: добавлен ввод скорости и удаление барьеров.",
     Duration = 5
 })
