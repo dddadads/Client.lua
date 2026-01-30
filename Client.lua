@@ -11,6 +11,7 @@ local ScriptSettings = {
     Fullbright = false,
     EspPlayers = false,
     EspComputer = false,
+    EspEscape = false, -- Новая настройка для выхода
     EspLocker = false,
     EspBallPit = false,
     ShowDistance = false,
@@ -293,6 +294,15 @@ VisualsTab:CreateToggle({
     end
 })
 
+VisualsTab:CreateToggle({
+    Name = "ESP Выхода (Escape)",
+    CurrentValue = false,
+    Flag = "ESP_Escape",
+    Callback = function(v)
+        ScriptSettings.EspEscape = v
+    end
+})
+
 -- Цикл обновления ESP
 task.spawn(function()
     while true do
@@ -306,8 +316,19 @@ task.spawn(function()
         
         if ScriptSettings.EspComputer then
             for _, obj in pairs(workspace:GetDescendants()) do
+                -- Проверка на компьютер
                 if (obj.Name == "Meshes/t_Cube" or obj:GetAttribute("Progress")) and obj.Parent:IsA("Model") then
                     ApplyESP(obj.Parent, Color3.fromRGB(0, 255, 150), "Компьютер", true)
+                end
+            end
+        end
+
+        if ScriptSettings.EspEscape then
+            for _, obj in pairs(workspace:GetDescendants()) do
+                -- Поиск выхода (Escape) в той же папке или по имени
+                if obj.Name == "Escape" or obj.Name == "EscapeDoor" or obj.Name == "Exit" then
+                    local target = obj:IsA("Model") and obj or obj.Parent
+                    ApplyESP(target, Color3.fromRGB(255, 255, 0), "ВЫХОД", false)
                 end
             end
         end
@@ -363,7 +384,7 @@ end)
 
 Rayfield:Notify({
     Title = "CoolHub",
-    Content = "ESP исправлен!",
+    Content = "ESP выхода добавлен!",
     Duration = 5,
     Image = 4483362458,
 })
