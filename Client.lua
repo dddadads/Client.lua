@@ -118,9 +118,13 @@ local function ApplyESP(object, color, name, isComputer)
                 
                 if isComputer and ScriptSettings.ShowProgress then
                     local prog = object:GetAttribute("Progress") or 0
-                    local maxVal = (prog > 105) and 400 or 100
-                    local percentage = math.clamp(math.floor((prog / maxVal) * 100), 0, 100)
+                    -- Универсальная логика: если значение больше 100, ищем ближайший порог (400 или больше)
+                    local maxVal = 100
+                    if prog > 100 then
+                        if prog <= 400 then maxVal = 400 else maxVal = 500 end
+                    end
                     
+                    local percentage = math.clamp(math.floor((prog / maxVal) * 100), 0, 100)
                     finalString = finalString .. string.format("\nПрогресс: %d%%", percentage)
                 end
                 
@@ -359,7 +363,7 @@ end)
 
 Rayfield:Notify({
     Title = "CoolHub",
-    Content = "Защита Noclip добавлена!",
+    Content = "ESP исправлен!",
     Duration = 5,
     Image = 4483362458,
 })
