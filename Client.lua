@@ -124,22 +124,23 @@ local function ApplyESP(object, color, name, isComputer)
                 end
                 label.Text = finalString
             end
-            task.wait(0.5)
+            task.wait(0.1) -- Ускорили обновление текста для плавности, так как это не лагает
         end
     end)
 end
 
--- Кэширование
+-- Оптимизированное кэширование (выполняется редко)
 local function RefreshMapCache()
-    table.clear(CachedObjects.Computers)
+    local newComputers = {}
     for _, obj in pairs(workspace:GetDescendants()) do
         if (obj:GetAttribute("Progress") ~= nil or obj.Name == "Meshes/t_Cube") then
             local target = obj:IsA("Model") and obj or obj:FindFirstAncestorOfClass("Model")
-            if target and not table.find(CachedObjects.Computers, target) then
-                table.insert(CachedObjects.Computers, target)
+            if target and not table.find(newComputers, target) then
+                table.insert(newComputers, target)
             end
         end
     end
+    CachedObjects.Computers = newComputers
 end
 
 -- --- ВКЛАДКИ ---
@@ -166,7 +167,7 @@ PlayerTab:CreateToggle({
                 if LP.Character and LP.Character:FindFirstChild("Humanoid") then
                     LP.Character.Humanoid.WalkSpeed = ScriptSettings.WalkSpeed
                 end
-                task.wait(0.1)
+                task.wait(0.05)
             end
         end)
     end
@@ -270,7 +271,7 @@ MiscTab:CreateToggle({
                             obj.HoldDuration = 0
                         end
                     end
-                    task.wait(1)
+                    task.wait(2) -- Проверка раз в 2 сек достаточно
                 end
             end)
         else
@@ -301,7 +302,7 @@ MiscTab:CreateToggle({
                         end
                     end
                 end
-                task.wait(0.2)
+                task.wait(0.3)
             end
         end)
     end
@@ -328,23 +329,40 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- Основной цикл
+-- --- ОПТИМИЗИРОВАННЫЕ ЦИКЛЫ ---
+
+-- Цикл кэширования (тяжелый, раз в 20 секунд)
 task.spawn(function()
     while true do
-        RefreshMapCache()
+        if ScriptSettings.EspComputer or ScriptSettings.InstantInteraction or ScriptSettings.AutoInteract then
+            RefreshMapCache()
+        end
+        task.wait(20)
+    end
+end)
+
+-- Цикл ESP и Детектора (быстрый, легкий)
+task.spawn(function()
+    while true do
         if ScriptSettings.EspPlayers then
             for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LP and p.Character then ApplyESP(p.Character, Color3.fromRGB(255, 80, 80), p.Name, false) end
+                if p ~= LP and p.Character then 
+                    ApplyESP(p.Character, Color3.fromRGB(255, 80, 80), p.Name, false) 
+                end
             end
         end
+        
         if ScriptSettings.EspComputer then
-            for _, obj in pairs(CachedObjects.Computers) do ApplyESP(obj, Color3.fromRGB(0, 255, 150), "Компьютер", true) end
+            for _, obj in pairs(CachedObjects.Computers) do 
+                ApplyESP(obj, Color3.fromRGB(0, 255, 150), "Компьютер", true) 
+            end
         end
         
         -- Детектор убийцы
         for _, p in pairs(Players:GetPlayers()) do
-            if p.Name:find("Killer") or (p.Character and p.Character:FindFirstChild("Knife")) then
-                if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("HumanoidRootPart") then
+            if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                -- Поиск по имени или предмету
+                if p.Name:lower():find("killer") or p.Character:FindFirstChild("Knife") or p.Character:FindFirstChild("Weapon") then
                     local dist = (LP.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
                     if dist < 50 then
                         Rayfield:Notify({Title = "ВНИМАНИЕ!", Content = "Убийца близко! ("..math.floor(dist).."м)", Duration = 1})
@@ -352,11 +370,9 @@ task.spawn(function()
                 end
             end
         end
-        
-        task.wait(1)
+        task.wait(0.5)
     end
 end)
 
 Rayfield:LoadConfiguration()
--- Применение FOV после загрузки конфига
 workspace.CurrentCamera.FieldOfView = ScriptSettings.FieldOfView
