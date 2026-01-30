@@ -11,7 +11,7 @@ local ScriptSettings = {
     Fullbright = false,
     EspPlayers = false,
     EspComputer = false,
-    EspEscape = false, -- Новая настройка для выхода
+    EspEscape = false, 
     EspLocker = false,
     EspBallPit = false,
     ShowDistance = false,
@@ -46,7 +46,7 @@ pcall(function()
     gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
 end)
 
--- Создание окна с твоим авторством
+-- Создание окна
 local Window = Rayfield:CreateWindow({
     Name = "CoolHub | Five Nights: Hunted",
     Icon = 0,
@@ -63,10 +63,10 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- Вкладки
-local InfoTab = Window:CreateTab("Инфо", 4483362458)
-local PlayerTab = Window:CreateTab("Игрок", 4483362458)
-local VisualsTab = Window:CreateTab("Визуалы", 4483362458)
-local SettingsTab = Window:CreateTab("Настройки", 4483362458)
+local InfoTab = Window:CreateTab("Инфо", "info")
+local PlayerTab = Window:CreateTab("Игрок", "user")
+local VisualsTab = Window:CreateTab("Визуалы", "eye")
+local SettingsTab = Window:CreateTab("Настройки", "settings")
 
 -- --- УЛУЧШЕННАЯ СИСТЕМА ESP ---
 local function ApplyESP(object, color, name, isComputer)
@@ -119,11 +119,8 @@ local function ApplyESP(object, color, name, isComputer)
                 
                 if isComputer and ScriptSettings.ShowProgress then
                     local prog = object:GetAttribute("Progress") or 0
-                    -- Универсальная логика: если значение больше 100, ищем ближайший порог (400 или больше)
-                    local maxVal = 100
-                    if prog > 100 then
-                        if prog <= 400 then maxVal = 400 else maxVal = 500 end
-                    end
+                    -- Фикс 75%: Если значение больше 105, значит максимум 400
+                    local maxVal = (prog > 105) and 400 or 100
                     
                     local percentage = math.clamp(math.floor((prog / maxVal) * 100), 0, 100)
                     finalString = finalString .. string.format("\nПрогресс: %d%%", percentage)
@@ -165,12 +162,12 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 -- --- ВКЛАДКА ИНФО ---
-local InfoParagraph = InfoTab:CreateParagraph({Title = "Статус CoolHub", Content = "Обновление..."})
+local InfoParagraph = InfoTab:CreateParagraph({Title = "Статус CoolHub", Content = "Загрузка данных сервера..."})
 task.spawn(function()
     while true do
         pcall(function()
             local content = string.format(
-                "👤 Автор: coolguis119\n🎮 Игра: %s\n👥 Игроков: %d/%d\n🆔 Сервер: %s",
+                "👤 Автор: coolguis119\n🎮 Игра: %s\n🎮 Игроков: %d/%d\n🆔 Сервер: %s",
                 gameName, #Players:GetPlayers(), Players.MaxPlayers, game.JobId:sub(1,8)
             )
             InfoParagraph:Set({Title = "Статус CoolHub", Content = content})
@@ -189,7 +186,6 @@ PlayerTab:CreateToggle({
         if Value then
             RunService:BindToRenderStep("NoclipLoop", 1, function()
                 if LP.Character and LP.Character:FindFirstChild("Humanoid") then
-                    -- Проверка HP: если 0, то ноклип не работает (защита от падения под карту)
                     if LP.Character.Humanoid.Health > 0 then
                         for _, part in pairs(LP.Character:GetDescendants()) do
                             if part:IsA("BasePart") then part.CanCollide = false end
@@ -248,6 +244,41 @@ PlayerTab:CreateToggle({
 
 -- --- ВКЛАДКА ВИЗУАЛЫ ---
 VisualsTab:CreateToggle({
+    Name = "ESP Игроков",
+    CurrentValue = false,
+    Flag = "ESP_Players",
+    Callback = function(v) ScriptSettings.EspPlayers = v end
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Компьютеров",
+    CurrentValue = false,
+    Flag = "ESP_Computers",
+    Callback = function(v) ScriptSettings.EspComputer = v end
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Выхода (Escape)",
+    CurrentValue = false,
+    Flag = "ESP_Escape",
+    Callback = function(v) ScriptSettings.EspEscape = v end
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Шкафчиков",
+    CurrentValue = false,
+    Flag = "ESP_Lockers",
+    Callback = function(v) ScriptSettings.EspLocker = v end
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Ям с шариками",
+    CurrentValue = false,
+    Flag = "ESP_BallPits",
+    Callback = function(v) ScriptSettings.EspBallPit = v end
+})
+
+VisualsTab:CreateToggle({
     Name = "Super Fullbright (Ночное зрение)",
     CurrentValue = false,
     Flag = "FullbrightFlag",
@@ -276,33 +307,6 @@ VisualsTab:CreateToggle({
     end
 })
 
-VisualsTab:CreateToggle({
-    Name = "ESP Игроков",
-    CurrentValue = false,
-    Flag = "ESP_Players",
-    Callback = function(v)
-        ScriptSettings.EspPlayers = v
-    end
-})
-
-VisualsTab:CreateToggle({
-    Name = "ESP Компьютеров",
-    CurrentValue = false,
-    Flag = "ESP_Computers",
-    Callback = function(v)
-        ScriptSettings.EspComputer = v
-    end
-})
-
-VisualsTab:CreateToggle({
-    Name = "ESP Выхода (Escape)",
-    CurrentValue = false,
-    Flag = "ESP_Escape",
-    Callback = function(v)
-        ScriptSettings.EspEscape = v
-    end
-})
-
 -- Цикл обновления ESP
 task.spawn(function()
     while true do
@@ -316,7 +320,6 @@ task.spawn(function()
         
         if ScriptSettings.EspComputer then
             for _, obj in pairs(workspace:GetDescendants()) do
-                -- Проверка на компьютер
                 if (obj.Name == "Meshes/t_Cube" or obj:GetAttribute("Progress")) and obj.Parent:IsA("Model") then
                     ApplyESP(obj.Parent, Color3.fromRGB(0, 255, 150), "Компьютер", true)
                 end
@@ -325,10 +328,27 @@ task.spawn(function()
 
         if ScriptSettings.EspEscape then
             for _, obj in pairs(workspace:GetDescendants()) do
-                -- Поиск выхода (Escape) в той же папке или по имени
                 if obj.Name == "Escape" or obj.Name == "EscapeDoor" or obj.Name == "Exit" then
                     local target = obj:IsA("Model") and obj or obj.Parent
                     ApplyESP(target, Color3.fromRGB(255, 255, 0), "ВЫХОД", false)
+                end
+            end
+        end
+
+        if ScriptSettings.EspLocker then
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj.Name == "Locker" or obj.Name == "Closet" then
+                    local target = obj:IsA("Model") and obj or obj.Parent
+                    ApplyESP(target, Color3.fromRGB(150, 150, 150), "Шкафчик", false)
+                end
+            end
+        end
+
+        if ScriptSettings.EspBallPit then
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj.Name == "BallPit" or obj.Name == "Ball Pit" then
+                    local target = obj:IsA("Model") and obj or obj.Parent
+                    ApplyESP(target, Color3.fromRGB(255, 100, 255), "Яма с шариками", false)
                 end
             end
         end
@@ -384,7 +404,7 @@ end)
 
 Rayfield:Notify({
     Title = "CoolHub",
-    Content = "ESP выхода добавлен!",
+    Content = "Canvas обновлен: добавлены шкафчики и бассейны!",
     Duration = 5,
     Image = 4483362458,
 })
