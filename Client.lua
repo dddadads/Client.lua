@@ -1,378 +1,198 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
--- Конфигурация и Состояние
-local ScriptSettings = {
-    WalkSpeed = 16,
-    FlySpeed = 50,
-    Noclip = false,
-    FlyEnabled = false,
-    SpeedEnabled = false,
-    InfJump = false,
-    Fullbright = false,
-    EspPlayers = false,
-    EspComputer = false,
-    ShowDistance = false,
-    ShowProgress = false,
-    FieldOfView = 70,
-    AntiAFK = true,
-    AutoInteract = false,
-    InstantInteraction = false,
-    Theme = "Default"
-}
-
--- Сервисы
 local Players = game:GetService("Players")
-local LP = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local MarketplaceService = game:GetService("MarketplaceService")
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local Player = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- Переменные
-local CachedObjects = {Computers = {}}
-local OriginalHoldDurations = {}
-
--- Anti-AFK
-for i,v in pairs(getconnections(LP.Idled)) do
-    v:Disable()
-end
-
--- Информация об игре
-local gameName = "Unknown"
-pcall(function()
-    gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
-end)
-
--- Создание окна
-local Window = Rayfield:CreateWindow({
-    Name = "CoolHub | Five Nights: Hunted",
-    Icon = 0,
-    LoadingTitle = "CoolHub Loading...",
-    LoadingSubtitle = "by coolguis119",
-    Theme = ScriptSettings.Theme,
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "CoolHub_FNH",
-        FileName = "Config"
+-- КОНФИГУРАЦИЯ
+local Config = {
+    SpeedEnabled = false,
+    DefaultSpeed = 16, -- Переменная для хранения обычной скорости
+    ESPEnabled = false,
+    FOVEnabled = false,
+    Fullbright = false,
+    Visible = true,
+    Binds = {
+        Menu = Enum.KeyCode.Insert,
+        Speed = Enum.KeyCode.Z,
+        ESP = Enum.KeyCode.X,
+        FOV = Enum.KeyCode.J,
+        Dash = Enum.KeyCode.V,
+        Bright = Enum.KeyCode.B
     }
-})
+}
 
--- Вкладки
-local InfoTab = Window:CreateTab("Инфо", "info")
-local PlayerTab = Window:CreateTab("Игрок", "user")
-local VisualsTab = Window:CreateTab("Визуалы", "eye")
-local MiscTab = Window:CreateTab("Разное", "plus-circle")
-local SettingsTab = Window:CreateTab("Настройки", "settings")
+-- ГУИ
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "Xeno_V8_Final"
+ScreenGui.DisplayOrder = 2147483647
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = Player:WaitForChild("PlayerGui")
 
--- --- СИСТЕМА ESP ---
-local function ApplyESP(object, color, name, isComputer)
-    if not object or object:FindFirstChild("Enhanced_ESP") then return end
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 250, 0, 320)
+Main.Position = UDim2.new(0.05, 0, 0.3, 0)
+Main.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner", Main)
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Color = Color3.fromRGB(0, 200, 255)
+Stroke.Thickness = 2
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+Title.Text = "XENO GHOST V8"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.Parent = Main
+Instance.new("UICorner", Title)
+
+local Close = Instance.new("TextButton")
+Close.Size = UDim2.new(0, 30, 0, 30)
+Close.Position = UDim2.new(1, -35, 0, 7)
+Close.Text = "×"
+Close.TextSize = 25
+Close.TextColor3 = Color3.new(1, 0, 0.2)
+Close.BackgroundTransparency = 1
+Close.Parent = Main
+
+local List = Instance.new("UIListLayout", Main)
+List.Padding = UDim.new(0, 8)
+List.HorizontalAlignment = Enum.HorizontalAlignment.Center
+List.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Функция для кнопок
+local function createBtn(name, key, defaultColor)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0.9, 0, 0, 35)
+    b.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    b.Text = name .. " [" .. key.Name .. "]"
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.Gotham
+    b.Parent = Main
+    Instance.new("UICorner", b)
+    return b
+end
+
+local bSpeed = createBtn("Speed Hack", Config.Binds.Speed)
+local bESP = createBtn("Visuals ESP", Config.Binds.ESP)
+local bFOV = createBtn("Wide Vision", Config.Binds.FOV)
+local bDash = createBtn("Back Dash", Config.Binds.Dash)
+local bBright = createBtn("Fullbright", Config.Binds.Bright)
+
+-- ЛОГИКА ФУНКЦИЙ
+local function doDash()
+    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.CFrame = hrp.CFrame * CFrame.new(0, 0, 7)
+    end
+end
+
+local function toggleBright()
+    Config.Fullbright = not Config.Fullbright
+    if Config.Fullbright then
+        Lighting.Ambient = Color3.new(1, 1, 1)
+        Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+        Lighting.Brightness = 2
+    else
+        Lighting.Ambient = Color3.new(0.5, 0.5, 0.5)
+        Lighting.Brightness = 1
+    end
+end
+
+-- ESP
+local function applyESP(obj, color)
+    if not Config.ESPEnabled then return end
+    local h = obj:FindFirstChild("XenoHighlight") or Instance.new("Highlight")
+    h.Name = "XenoHighlight"
+    h.FillColor = color
+    h.FillTransparency = 0.5
+    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    h.Parent = obj
+end
+
+-- ЦИКЛ ОБНОВЛЕНИЯ
+RunService.RenderStepped:Connect(function()
+    -- Speed
+    if Config.SpeedEnabled and Player.Character and Player.Character:FindFirstChild("Humanoid") then
+        Player.Character.Humanoid.WalkSpeed = 19 -- Твоя скорость при чите
+    end
     
-    local targetPart = object:IsA("Model") and (object.PrimaryPart or object:FindFirstChildWhichIsA("BasePart")) or object
-    if not targetPart then return end
+    -- FOV
+    Camera.FieldOfView = Config.FOVEnabled and 90 or 70
 
-    local folder = Instance.new("Folder")
-    folder.Name = "Enhanced_ESP"
-    folder.Parent = object
-
-    local highlight = Instance.new("Highlight")
-    highlight.FillColor = color
-    highlight.OutlineColor = Color3.new(1,1,1)
-    highlight.FillTransparency = 0.5
-    highlight.OutlineTransparency = 0
-    highlight.Adornee = object
-    highlight.Parent = folder
-
-    local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 150, 0, 50)
-    billboard.AlwaysOnTop = true
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
-    billboard.Adornee = targetPart
-    billboard.Parent = folder
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = color
-    label.TextStrokeTransparency = 0.5
-    label.Font = Enum.Font.SourceSansBold
-    label.TextScaled = true
-    label.Text = name
-    label.Parent = billboard
-
-    task.spawn(function()
-        while object and object.Parent and folder.Parent do
-            local settingActive = (name == "Компьютер") and ScriptSettings.EspComputer or ScriptSettings.EspPlayers
-            
-            highlight.Enabled = settingActive
-            billboard.Enabled = settingActive
-            
-            if settingActive and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-                local root = LP.Character.HumanoidRootPart
-                local distance = (targetPart.Position - root.Position).Magnitude
-                
-                local finalString = name
-                if ScriptSettings.ShowDistance then
-                    finalString = finalString .. string.format(" [%dм]", math.floor(distance))
-                end
-                
-                if isComputer and ScriptSettings.ShowProgress then
-                    local prog = object:GetAttribute("Progress") or 0
-                    local maxVal = (prog > 101) and 400 or 100
-                    local percentage = math.clamp(math.floor((prog / maxVal) * 100), 0, 100)
-                    finalString = finalString .. string.format("\nПрогресс: %d%%", percentage)
-                end
-                label.Text = finalString
-            end
-            task.wait(0.1) -- Ускорили обновление текста для плавности, так как это не лагает
-        end
-    end)
-end
-
--- Оптимизированное кэширование (выполняется редко)
-local function RefreshMapCache()
-    local newComputers = {}
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if (obj:GetAttribute("Progress") ~= nil or obj.Name == "Meshes/t_Cube") then
-            local target = obj:IsA("Model") and obj or obj:FindFirstAncestorOfClass("Model")
-            if target and not table.find(newComputers, target) then
-                table.insert(newComputers, target)
-            end
-        end
-    end
-    CachedObjects.Computers = newComputers
-end
-
--- --- ВКЛАДКИ ---
-InfoTab:CreateParagraph({Title = "CoolHub Info", Content = "👤 Автор: coolguis119\n🎮 Игра: " .. gameName})
-
--- Игрок
-PlayerTab:CreateInput({
-    Name = "Скорость бега",
-    PlaceholderText = "16",
-    Flag = "WalkSpeedInput",
-    Callback = function(Text)
-        ScriptSettings.WalkSpeed = tonumber(Text) or 16
-    end,
-})
-
-PlayerTab:CreateToggle({
-    Name = "Включить Скорость",
-    CurrentValue = false,
-    Flag = "SpeedEnabled",
-    Callback = function(v)
-        ScriptSettings.SpeedEnabled = v
-        task.spawn(function()
-            while ScriptSettings.SpeedEnabled do
-                if LP.Character and LP.Character:FindFirstChild("Humanoid") then
-                    LP.Character.Humanoid.WalkSpeed = ScriptSettings.WalkSpeed
-                end
-                task.wait(0.05)
-            end
-        end)
-    end
-})
-
-PlayerTab:CreateToggle({
-    Name = "Noclip (Сквозь стены)",
-    CurrentValue = false,
-    Flag = "Noclip",
-    Callback = function(v)
-        ScriptSettings.Noclip = v
-        if v then
-            RunService:BindToRenderStep("NoclipLoop", 1, function()
-                if LP.Character then
-                    for _, p in pairs(LP.Character:GetDescendants()) do
-                        if p:IsA("BasePart") then p.CanCollide = false end
-                    end
-                end
-            end)
-        else
-            RunService:UnbindFromRenderStep("NoclipLoop")
-        end
-    end
-})
-
-PlayerTab:CreateToggle({
-    Name = "Бесконечные Прыжки",
-    CurrentValue = false,
-    Flag = "InfJump",
-    Callback = function(v) ScriptSettings.InfJump = v end
-})
-
--- Визуалы
-VisualsTab:CreateToggle({
-    Name = "ESP Игроков",
-    CurrentValue = false,
-    Flag = "EspPlayers",
-    Callback = function(v) ScriptSettings.EspPlayers = v end
-})
-
-VisualsTab:CreateToggle({
-    Name = "ESP Компьютеров",
-    CurrentValue = false,
-    Flag = "EspComputers",
-    Callback = function(v) 
-        ScriptSettings.EspComputer = v 
-        if v then RefreshMapCache() end
-    end
-})
-
-VisualsTab:CreateToggle({
-    Name = "Fullbright (Свет)",
-    CurrentValue = false,
-    Flag = "Fullbright",
-    Callback = function(v)
-        ScriptSettings.Fullbright = v
-        if v then
-            task.spawn(function()
-                while ScriptSettings.Fullbright do
-                    Lighting.Brightness = 2
-                    Lighting.ClockTime = 14
-                    Lighting.GlobalShadows = false
-                    task.wait(1)
-                end
-            end)
-        else
-            Lighting.Brightness = 1
-            Lighting.ClockTime = 0
-            Lighting.GlobalShadows = true
-        end
-    end
-})
-
--- Разное
-MiscTab:CreateSlider({
-    Name = "Field of View (FOV)",
-    Range = {70, 120},
-    Increment = 1,
-    CurrentValue = 70,
-    Flag = "FOV",
-    Callback = function(v)
-        ScriptSettings.FieldOfView = v
-        workspace.CurrentCamera.FieldOfView = v
-    end
-})
-
-MiscTab:CreateToggle({
-    Name = "Instant Interaction (Мгновенно)",
-    CurrentValue = false,
-    Flag = "InstantInteraction",
-    Callback = function(v)
-        ScriptSettings.InstantInteraction = v
-        if v then
-            task.spawn(function()
-                while ScriptSettings.InstantInteraction do
-                    for _, obj in pairs(workspace:GetDescendants()) do
-                        if obj:IsA("ProximityPrompt") then
-                            if not OriginalHoldDurations[obj] then
-                                OriginalHoldDurations[obj] = obj.HoldDuration
-                            end
-                            obj.HoldDuration = 0
-                        end
-                    end
-                    task.wait(2) -- Проверка раз в 2 сек достаточно
-                end
-            end)
-        else
-            for obj, duration in pairs(OriginalHoldDurations) do
-                if obj and obj.Parent then
-                    obj.HoldDuration = duration
-                end
-            end
-        end
-    end
-})
-
-MiscTab:CreateToggle({
-    Name = "Auto Interact (Авто-E)",
-    CurrentValue = false,
-    Flag = "AutoInteract",
-    Callback = function(v)
-        ScriptSettings.AutoInteract = v
-        task.spawn(function()
-            while ScriptSettings.AutoInteract do
-                for _, obj in pairs(workspace:GetDescendants()) do
-                    if obj:IsA("ProximityPrompt") and obj.Enabled then
-                        if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-                            local dist = (LP.Character.HumanoidRootPart.Position - obj.Parent.Position).Magnitude
-                            if dist < 10 then
-                                fireproximityprompt(obj)
-                            end
-                        end
-                    end
-                end
-                task.wait(0.3)
-            end
-        end)
-    end
-})
-
-MiscTab:CreateButton({
-    Name = "Clear Barriers (Барьеры)",
-    Callback = function()
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj.Name == "Barriers" then obj:Destroy() end
-        end
-        Rayfield:Notify({Title = "CoolHub", Content = "Барьеры удалены!", Duration = 3})
-    end
-})
-
--- Настройки
-SettingsTab:CreateToggle({Name = "Показывать Дистанцию", Flag = "ShowDist", Callback = function(v) ScriptSettings.ShowDistance = v end})
-SettingsTab:CreateToggle({Name = "Показывать Прогресс %", Flag = "ShowProg", Callback = function(v) ScriptSettings.ShowProgress = v end})
-
--- Прыжок
-UserInputService.JumpRequest:Connect(function()
-    if ScriptSettings.InfJump and LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then
-        LP.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
-    end
-end)
-
--- --- ОПТИМИЗИРОВАННЫЕ ЦИКЛЫ ---
-
--- Цикл кэширования (тяжелый, раз в 20 секунд)
-task.spawn(function()
-    while true do
-        if ScriptSettings.EspComputer or ScriptSettings.InstantInteraction or ScriptSettings.AutoInteract then
-            RefreshMapCache()
-        end
-        task.wait(20)
-    end
-end)
-
--- Цикл ESP и Детектора (быстрый, легкий)
-task.spawn(function()
-    while true do
-        if ScriptSettings.EspPlayers then
-            for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LP and p.Character then 
-                    ApplyESP(p.Character, Color3.fromRGB(255, 80, 80), p.Name, false) 
-                end
-            end
-        end
-        
-        if ScriptSettings.EspComputer then
-            for _, obj in pairs(CachedObjects.Computers) do 
-                ApplyESP(obj, Color3.fromRGB(0, 255, 150), "Компьютер", true) 
-            end
-        end
-        
-        -- Детектор убийцы
+    -- Player ESP
+    if Config.ESPEnabled then
         for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                -- Поиск по имени или предмету
-                if p.Name:lower():find("killer") or p.Character:FindFirstChild("Knife") or p.Character:FindFirstChild("Weapon") then
-                    local dist = (LP.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
-                    if dist < 50 then
-                        Rayfield:Notify({Title = "ВНИМАНИЕ!", Content = "Убийца близко! ("..math.floor(dist).."м)", Duration = 1})
-                    end
-                end
+            if p ~= Player and p.Character then
+                local isK = p.Team and (p.Team.Name:lower():find("killer") or p.Team.Name:lower():find("murder")) 
+                local color = (isK or p.TeamColor == BrickColor.new("Bright red")) and Color3.new(1, 0, 0) or Color3.new(0, 0.5, 1)
+                applyESP(p.Character, color)
             end
         end
-        task.wait(0.5)
     end
 end)
 
-Rayfield:LoadConfiguration()
-workspace.CurrentCamera.FieldOfView = ScriptSettings.FieldOfView
+-- СКАНЕР МИРА
+task.spawn(function()
+    while true do
+        if Config.ESPEnabled then
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj.Name == "Window" then applyESP(obj, Color3.new(0, 1, 1))
+                elseif obj.Name == "Palletwrong" or obj.Name:find("Pallet") then applyESP(obj, Color3.new(0, 1, 0))
+                elseif obj.Name == "Generator" then applyESP(obj, Color3.new(1, 1, 0)) end
+            end
+        end
+        task.wait(4)
+    end
+end)
+
+-- ОБРАБОТКА ВВОДА
+UserInputService.InputBegan:Connect(function(i, gp)
+    if gp then return end
+    
+    if i.KeyCode == Config.Binds.Menu then
+        Config.Visible = not Config.Visible
+        Main.Visible = Config.Visible
+        
+    elseif i.KeyCode == Config.Binds.Speed then
+        local hum = Player.Character and Player.Character:FindFirstChild("Humanoid")
+        if hum then
+            Config.SpeedEnabled = not Config.SpeedEnabled
+            
+            if Config.SpeedEnabled then
+                -- Запоминаем текущую скорость перед включением
+                Config.DefaultSpeed = hum.WalkSpeed
+                hum.WalkSpeed = 19
+            else
+                -- Возвращаем сохраненную скорость при выключении
+                hum.WalkSpeed = Config.DefaultSpeed
+            end
+            
+            bSpeed.BackgroundColor3 = Config.SpeedEnabled and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(30, 30, 45)
+        end
+        
+    elseif i.KeyCode == Config.Binds.Dash then
+        doDash()
+    elseif i.KeyCode == Config.Binds.Bright then
+        toggleBright()
+        bBright.BackgroundColor3 = Config.Fullbright and Color3.fromRGB(200, 200, 0) or Color3.fromRGB(30, 30, 45)
+    elseif i.KeyCode == Config.Binds.FOV then
+        Config.FOVEnabled = not Config.FOVEnabled
+        bFOV.BackgroundColor3 = Config.FOVEnabled and Color3.fromRGB(0, 100, 200) or Color3.fromRGB(30, 30, 45)
+    elseif i.KeyCode == Config.Binds.ESP then
+        Config.ESPEnabled = not Config.ESPEnabled
+        bESP.BackgroundColor3 = Config.ESPEnabled and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(30, 30, 45)
+    end
+end)
+
+Close.MouseButton1Click:Connect(function() Main.Visible = false end)
